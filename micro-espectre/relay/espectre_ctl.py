@@ -21,6 +21,14 @@ Modes:
     python3 espectre_ctl.py --send <node_id|mac|ip> STOP
         One-shot: broadcast a few KNOCKs to (re)discover, send the command,
         exit. Good for scripting/testing without a long-running daemon.
+
+    python3 espectre_ctl.py --knock [timeout_sec]
+        One-shot: broadcast discovery for `timeout_sec` (default 5), print
+        every board that replied, exit.
+
+    python3 espectre_ctl.py --list
+        One-shot: print the last-known cache (from .nodes.json) with no
+        network activity - fast, but can be stale; run --knock to refresh.
 """
 import json
 import socket
@@ -250,6 +258,13 @@ if __name__ == "__main__":
                 print("usage: espectre_ctl.py --send <node_id|mac|ip> START [duration] | STOP")
                 sys.exit(1)
             run_one_shot(sys.argv[2], sys.argv[3:])
+        elif len(sys.argv) > 1 and sys.argv[1] == "--knock":
+            timeout = float(sys.argv[2]) if len(sys.argv) > 2 else 5.0
+            print(f"knocking for {timeout}s...")
+            discover_all(timeout=timeout, verbose=False)
+            print_list()
+        elif len(sys.argv) > 1 and sys.argv[1] == "--list":
+            print_list()
         else:
             run_daemon(interactive=sys.stdin.isatty())
     except KeyboardInterrupt:
