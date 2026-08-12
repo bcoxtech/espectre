@@ -1,6 +1,9 @@
 # Local configuration (security)
 src/config_local.py
 
+# Control-plane node registry (deployment-specific, not portable across networks)
+relay/.nodes.json
+
 # MicroPython compiled files
 *.mpy
 

@@ -18,3 +18,8 @@ MQTT_BROKER = "homeassistant.local"  # Your MQTT broker IP or hostname
 MQTT_PORT = 1883
 MQTT_USERNAME = "username"
 MQTT_PASSWORD = "password"
+
+# Control Plane Configuration (only used if deployed with `./me deploy --control-plane`)
+# IP of the host running the control listener (e.g. espectre_ctl.py on the Pi relay)
+CONTROL_HOST = "192.168.0.7"
+CONTROL_PORT = 5002
