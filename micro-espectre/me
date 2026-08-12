@@ -567,6 +567,133 @@ def deploy_code(args):
         sys.exit(1)
 
 
+def _import_relay_ctl():
+    """Add the repo root to sys.path and import the control-plane client (relay/espectre_ctl.py)."""
+    parent_dir = Path(__file__).parent
+    if str(parent_dir) not in sys.path:
+        sys.path.insert(0, str(parent_dir))
+    try:
+        from relay import espectre_ctl
+    except ImportError as e:
+        print(f"{Fore.RED}❌ Failed to import relay/espectre_ctl.py: {e}{Style.RESET_ALL}")
+        sys.exit(1)
+    return espectre_ctl
+
+
+def _print_node_table(nodes, header_style=Fore.CYAN):
+    print(f"{header_style}{'Node':<8}{'IP':<16}{'Chip':<8}{'State':<10}{'MAC'}{Style.RESET_ALL}")
+    print('-' * 62)
+    for mac, entry in sorted(nodes.items(), key=lambda kv: kv[1]['node_id']):
+        print(f"{entry['node_id']:<8}{entry['ip']:<16}{entry['chip']:<8}{entry['state']:<10}{mac}")
+
+
+def knock_nodes(args):
+    """Broadcast KNOCK on the control-plane channel and list boards that reply (runs on host/relay, not ESP32)"""
+    ctl = _import_relay_ctl()
+
+    print(f"{Fore.MAGENTA}╔═══════════════════════════════════════════════════════════╗{Style.RESET_ALL}")
+    print(f"{Fore.MAGENTA}║           μESPectre - Control-Plane Discovery              ║{Style.RESET_ALL}")
+    print(f"{Fore.MAGENTA}╚═══════════════════════════════════════════════════════════╝{Style.RESET_ALL}")
+    print()
+    print(f"{Fore.CYAN}Knocking for {args.timeout}s...{Style.RESET_ALL}")
+    nodes = ctl.discover_all(timeout=args.timeout, verbose=False)
+    print()
+
+    if not nodes:
+        print(f"{Fore.YELLOW}No boards responded.{Style.RESET_ALL}")
+        print(f"{Fore.YELLOW}Make sure they're powered on with the control-plane firmware{Style.RESET_ALL}")
+        print(f"{Fore.YELLOW}(deployed via ./me deploy --control-plane) and on the same network segment.{Style.RESET_ALL}")
+        return
+
+    _print_node_table(nodes)
+    print()
+    print(f"{Fore.GREEN}✅ {len(nodes)} board(s) responded "
+          f"(assigned node IDs are stable across runs - see relay/.nodes.json){Style.RESET_ALL}")
+
+
+def list_nodes(args):
+    """List previously-discovered boards from the persisted cache, without a live knock (runs on host/relay)"""
+    ctl = _import_relay_ctl()
+
+    print(f"{Fore.MAGENTA}╔═══════════════════════════════════════════════════════════╗{Style.RESET_ALL}")
+    print(f"{Fore.MAGENTA}║           μESPectre - Known Control-Plane Nodes            ║{Style.RESET_ALL}")
+    print(f"{Fore.MAGENTA}╚═══════════════════════════════════════════════════════════╝{Style.RESET_ALL}")
+    print()
+
+    if not ctl.registry:
+        print(f"{Fore.YELLOW}No nodes known yet. Run './me knock' first to discover boards on the network.{Style.RESET_ALL}")
+        return
+
+    now = time.time()
+    print(f"{Fore.CYAN}{'Node':<8}{'IP':<16}{'Chip':<8}{'State':<10}{'Last seen':<16}{'MAC'}{Style.RESET_ALL}")
+    print('-' * 78)
+    for mac, entry in sorted(ctl.registry.items(), key=lambda kv: kv[1]['node_id']):
+        age = now - entry['last_seen']
+        last_seen = "just now" if age < 1 else f"{age:.0f}s ago"
+        if age >= ctl.STALE_AFTER_SEC:
+            last_seen += " (stale)"
+        print(f"{entry['node_id']:<8}{entry['ip']:<16}{entry['chip']:<8}{entry['state']:<10}{last_seen:<16}{mac}")
+    print()
+    print(f"{Fore.CYAN}This is the last-known cache, not a live scan - run './me knock' to refresh it.{Style.RESET_ALL}")
+
+
+def _discover_targets(ctl, args):
+    """Shared by start/stop: knock, then resolve either --node or every discovered board."""
+    print(f"{Fore.CYAN}Knocking for {args.timeout}s...{Style.RESET_ALL}")
+    nodes = ctl.discover_all(timeout=args.timeout, verbose=False)
+
+    if args.node:
+        mac, entry = ctl.resolve(args.node)
+        if entry is None:
+            print(f"\n{Fore.RED}❌ Node '{args.node}' did not respond to discovery{Style.RESET_ALL}")
+            sys.exit(1)
+        return {mac: entry}
+    return nodes
+
+
+def start_nodes(args):
+    """Discover control-plane boards and send START to each, or one specific board with --node (runs on host/relay)"""
+    ctl = _import_relay_ctl()
+
+    print(f"{Fore.MAGENTA}╔═══════════════════════════════════════════════════════════╗{Style.RESET_ALL}")
+    print(f"{Fore.MAGENTA}║           μESPectre - Control-Plane Start                  ║{Style.RESET_ALL}")
+    print(f"{Fore.MAGENTA}╚═══════════════════════════════════════════════════════════╝{Style.RESET_ALL}")
+    print()
+    targets = _discover_targets(ctl, args)
+
+    if not targets:
+        print(f"\n{Fore.YELLOW}No boards responded - nothing to start{Style.RESET_ALL}")
+        return
+
+    print()
+    for mac in targets:
+        ctl.send_command(mac, f"START {args.duration}")
+    print()
+    print(f"{Fore.GREEN}✅ Sent START to {len(targets)} board(s) "
+          f"(duration: {'infinite' if args.duration == 0 else f'{args.duration}s'}){Style.RESET_ALL}")
+
+
+def stop_nodes(args):
+    """Discover control-plane boards and send STOP to each, or one specific board with --node (runs on host/relay)"""
+    ctl = _import_relay_ctl()
+
+    print(f"{Fore.MAGENTA}╔═══════════════════════════════════════════════════════════╗{Style.RESET_ALL}")
+    print(f"{Fore.MAGENTA}║           μESPectre - Control-Plane Stop                   ║{Style.RESET_ALL}")
+    print(f"{Fore.MAGENTA}╚═══════════════════════════════════════════════════════════╝{Style.RESET_ALL}")
+    print()
+    targets = _discover_targets(ctl, args)
+
+    if not targets:
+        print(f"\n{Fore.YELLOW}No boards responded - nothing to stop{Style.RESET_ALL}")
+        return
+
+    print()
+    for mac in targets:
+        ctl.send_command(mac, "STOP")
+    print()
+    print(f"{Fore.GREEN}✅ Sent STOP to {len(targets)} board(s){Style.RESET_ALL}")
+
+
 def stream_csi(args):
     """Stream CSI data via UDP for real-time visualization"""
     
@@ -1128,7 +1255,20 @@ Examples:
   
   # Run application
   ./me run
-  
+
+  # Control-plane: discover tethered-free boards on the network (run on host/relay)
+  ./me knock
+
+  # Control-plane: show previously-discovered boards without knocking again
+  ./me list
+
+  # Control-plane: start/stop streaming on every discovered board, or one with --node
+  # (--node accepts the short node ID from `me knock`/`me list`, e.g. node1 - or a MAC/IP)
+  ./me start --duration 30
+  ./me start --node node1 --duration 30
+  ./me stop
+  ./me stop --node node1
+
   # Stream CSI via UDP (on ESP32)
   ./me stream --ip 192.168.1.100
   
@@ -1174,7 +1314,35 @@ Examples:
     run_parser = subparsers.add_parser('run', help='Run application on ESP32')
     run_parser.add_argument('--port',
                            help='Serial port (auto-detected if not specified)')
-    
+
+    # Knock command (control-plane discovery, runs on host/relay)
+    knock_parser = subparsers.add_parser('knock',
+        help='Discover control-plane boards over the network and list them (runs on host/relay, not ESP32)')
+    knock_parser.add_argument('--timeout', type=float, default=5.0,
+                             help='Discovery window in seconds (default: 5.0)')
+
+    # List command (show cached nodes without a live knock, runs on host/relay)
+    list_parser = subparsers.add_parser('list',
+        help='List previously-discovered control-plane boards from the local cache, no live knock (runs on host/relay)')
+
+    # Start command (control-plane remote start, runs on host/relay)
+    start_parser = subparsers.add_parser('start',
+        help='Discover control-plane boards and send START to each, or one with --node (runs on host/relay, not ESP32)')
+    start_parser.add_argument('--node',
+                             help='Target a specific board by node ID, MAC, or IP (default: all discovered boards)')
+    start_parser.add_argument('--duration', type=int, default=0,
+                             help='Streaming duration in seconds sent to each board (0 = infinite, default: 0)')
+    start_parser.add_argument('--timeout', type=float, default=5.0,
+                             help='Discovery window in seconds (default: 5.0)')
+
+    # Stop command (control-plane remote stop, runs on host/relay)
+    stop_parser = subparsers.add_parser('stop',
+        help='Discover control-plane boards and send STOP to each, or one with --node (runs on host/relay, not ESP32)')
+    stop_parser.add_argument('--node',
+                            help='Target a specific board by node ID, MAC, or IP (default: all discovered boards)')
+    stop_parser.add_argument('--timeout', type=float, default=5.0,
+                            help='Discovery window in seconds (default: 5.0)')
+
     # Stream command
     stream_parser = subparsers.add_parser('stream', help='Stream CSI data via UDP for visualization')
     stream_parser.add_argument('--ip', required=True,
@@ -1249,6 +1417,14 @@ Examples:
         deploy_code(args)
     elif args.command == 'run':
         run_application(args)
+    elif args.command == 'knock':
+        knock_nodes(args)
+    elif args.command == 'list':
+        list_nodes(args)
+    elif args.command == 'start':
+        start_nodes(args)
+    elif args.command == 'stop':
+        stop_nodes(args)
     elif args.command == 'stream':
         stream_csi(args)
     elif args.command == 'verify':
