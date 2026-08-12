@@ -13,6 +13,11 @@ WIFI_PASSWORD = "YourPassword"
 # Format: "AA:BB:CC:DD:EE:FF" (or without separators).
 # WIFI_BSSID = "AA:BB:CC:DD:EE:FF"
 
+# Control Plane Configuration (used by boot_main.py, deployed to device root
+# as main.py - enables discovery + start/stop commands with no host tether)
+CONTROL_HOST = None  # IP of the host running the control listener (e.g. the Pi relay); None disables the control plane
+CONTROL_PORT = 5002
+
 # MQTT Configuration
 MQTT_BROKER = "homeassistant.local"  # Your MQTT broker IP
 MQTT_PORT = 1883

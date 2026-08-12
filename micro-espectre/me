@@ -533,11 +533,17 @@ def deploy_code(args):
             ('src/traffic_generator.py', ':src/'),
             ('src/main.py', ':src/'),
             ('src/csi_streamer.py', ':src/'),
+            ('src/control.py', ':src/'),
             ('src/mqtt/__init__.py', ':src/mqtt/'),
             ('src/mqtt/handler.py', ':src/mqtt/'),
             ('src/mqtt/commands.py', ':src/mqtt/'),
         ]
-        
+
+        if getattr(args, 'control_plane', False):
+            files_to_upload.append(('boot_main.py', ':main.py'))
+            print(f"{Fore.YELLOW}  (also deploying boot_main.py as device-root main.py - "
+                  f"device will auto-start the control plane on power-up){Style.RESET_ALL}")
+
         for src, dst in files_to_upload:
             if not Path(src).exists():
                 print(f"{Fore.RED}  ❌ File not found: {src}{Style.RESET_ALL}")
@@ -1159,6 +1165,10 @@ Examples:
     deploy_parser = subparsers.add_parser('deploy', help='Deploy code to MicroPython device')
     deploy_parser.add_argument('--port',
                               help='Serial port (auto-detected if not specified)')
+    deploy_parser.add_argument('--control-plane', action='store_true',
+                              help='Also deploy boot_main.py as the device-root main.py, so it '
+                                   'auto-starts the control-plane (discovery + start/stop) on '
+                                   'power-up with no host tether required')
     
     # Run command
     run_parser = subparsers.add_parser('run', help='Run application on ESP32')
