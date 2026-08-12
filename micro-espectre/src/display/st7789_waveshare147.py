@@ -25,6 +25,7 @@ Author: Claude Code (for Brennan C)
 License: GPLv3 (matches parent project)
 """
 import time
+import gc
 from machine import Pin, SPI
 import src.config as config
 from src.display.base import DisplayInterface
@@ -42,6 +43,8 @@ _LINE_HEIGHT = FONT.HEIGHT + 4
 # than starting flush against x_offset/0.
 _MARGIN_X = 8
 _MARGIN_TOP = 8
+_VISIBLE_WIDTH = 172
+_TEXT_WIDTH = _VISIBLE_WIDTH - 2 * _MARGIN_X
 
 
 class ST7789WaveshareDisplay(DisplayInterface):
@@ -64,26 +67,41 @@ class ST7789WaveshareDisplay(DisplayInterface):
             rotation=0,
         )
         self.tft.fill(BLACK)
+        # Total heap is invariant after boot (mem_alloc + mem_free never
+        # changes), so capturing it once here is enough to compute a
+        # percentage on every update() call without recomputing it.
+        self._total_heap = gc.mem_alloc() + gc.mem_free()
         self._last_update = 0
-        self._last_shown = None
+        self._last_lines = None
 
     def update(self, state, controller_ip, heap_free, packet_count):
         now = time.ticks_ms()
         if time.ticks_diff(now, self._last_update) < config.DISPLAY_UPDATE_INTERVAL_MS:
             return
-        shown = (state, controller_ip, heap_free // 1024, packet_count)
-        if shown == self._last_shown:
+        heap_pct = heap_free * 100 // self._total_heap
+        streaming = state == "STREAMING"
+        lines = (
+            ("State: {}".format(state), GREEN if streaming else WHITE),
+            ("Ctrl:  {}".format(controller_ip or "none"), WHITE),
+            ("Heap:  {}% free".format(heap_pct), WHITE),
+            ("Pkts:  {}".format(packet_count), YELLOW) if streaming else ("", WHITE),
+        )
+        if lines == self._last_lines:
             self._last_update = now
             return
         self._last_update = now
-        self._last_shown = shown
 
+        # Redraw only the lines that actually changed, instead of a
+        # full-screen fill+redraw every cycle - avoids the visible flash a
+        # full clear causes on every update.
         x = self._x_offset + _MARGIN_X
         y = _MARGIN_TOP
-        self.tft.fill(BLACK)
-        color = GREEN if state == "STREAMING" else WHITE
-        self.tft.text(FONT, "State: {}".format(state), x, y, color, BLACK)
-        self.tft.text(FONT, "Ctrl:  {}".format(controller_ip or "none"), x, y + _LINE_HEIGHT, WHITE, BLACK)
-        self.tft.text(FONT, "Heap:  {}KB".format(heap_free // 1024), x, y + 2 * _LINE_HEIGHT, WHITE, BLACK)
-        if state == "STREAMING":
-            self.tft.text(FONT, "Pkts:  {}".format(packet_count), x, y + 3 * _LINE_HEIGHT, YELLOW, BLACK)
+        prev_lines = self._last_lines or (None, None, None, None)
+        for i, (text, color) in enumerate(lines):
+            if prev_lines[i] == (text, color):
+                continue
+            line_y = y + i * _LINE_HEIGHT
+            self.tft.fill_rect(x, line_y, _TEXT_WIDTH, FONT.HEIGHT, BLACK)
+            if text:
+                self.tft.text(FONT, text, x, line_y, color, BLACK)
+        self._last_lines = lines
