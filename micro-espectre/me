@@ -511,7 +511,13 @@ def deploy_code(args):
                        stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=False)
         subprocess.run(['mpremote', 'connect', port, 'mkdir', ':src/mqtt'],
                        stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=False)
-        
+        subprocess.run(['mpremote', 'connect', port, 'mkdir', ':src/display'],
+                       stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=False)
+        subprocess.run(['mpremote', 'connect', port, 'mkdir', ':src/triggers'],
+                       stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=False)
+        subprocess.run(['mpremote', 'connect', port, 'mkdir', ':src/fonts'],
+                       stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=False)
+
         # Upload files
         print(f"{Fore.YELLOW}📤 Uploading files...{Style.RESET_ALL}")
         
@@ -537,6 +543,15 @@ def deploy_code(args):
             ('src/mqtt/__init__.py', ':src/mqtt/'),
             ('src/mqtt/handler.py', ':src/mqtt/'),
             ('src/mqtt/commands.py', ':src/mqtt/'),
+            ('src/st7789py.py', ':src/'),
+            ('src/fonts/__init__.py', ':src/fonts/'),
+            ('src/fonts/vga1_8x8.py', ':src/fonts/'),
+            ('src/display/__init__.py', ':src/display/'),
+            ('src/display/base.py', ':src/display/'),
+            ('src/display/st7789_waveshare147.py', ':src/display/'),
+            ('src/triggers/__init__.py', ':src/triggers/'),
+            ('src/triggers/base.py', ':src/triggers/'),
+            ('src/triggers/gpio_button.py', ':src/triggers/'),
         ]
 
         if getattr(args, 'control_plane', False):
