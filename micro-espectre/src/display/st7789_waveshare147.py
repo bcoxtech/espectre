@@ -10,12 +10,16 @@ _SUPPORTED_DISPLAYS table. The documented workaround (used for the sibling
 ESP32-C6-LCD-1.47, same panel) is to initialize the controller in its native
 240x320 mode and draw within an X-offset window sized to the actual 172px
 visible width. WAVESHARE_LCD147_X_OFFSET in config.py defaults to a centered
-guess ((240-172)//2 = 34) - not yet hardware-verified, see the display bench
-smoke test before trusting on-screen alignment.
+guess ((240-172)//2 = 34) - confirmed correct on real hardware via
+examples/lcd_smoke_test.py (2026-08-12).
 
 Pin numbers (SPI + reset/cs/dc/backlight) are sourced from a third-party
-MicroPython/LVGL config example for this exact board, also not yet
-hardware-verified - see bench smoke test.
+MicroPython/LVGL config example for this exact board - also bench-verified.
+
+Gotcha found during bring-up: SPI host id 2 hard-crashes/reboots this board
+(not a catchable Python exception - a full chip panic and USB
+disconnect/reconnect). SPI host id 1 works correctly. If porting this to a
+different ESP32-S3 board/firmware, don't assume id 2 is safe to try first.
 
 Author: Claude Code (for Brennan C)
 License: GPLv3 (matches parent project)
@@ -33,12 +37,17 @@ _CTRL_WIDTH = 240
 _CTRL_HEIGHT = 320
 
 _LINE_HEIGHT = FONT.HEIGHT + 4
+# Small TFT modules like this often physically hide a few pixels of the
+# addressable area under the bezel - pad text in from every edge rather
+# than starting flush against x_offset/0.
+_MARGIN_X = 8
+_MARGIN_TOP = 8
 
 
 class ST7789WaveshareDisplay(DisplayInterface):
     def __init__(self):
         spi = SPI(
-            2,
+            1,
             baudrate=20_000_000,
             sck=Pin(config.WAVESHARE_LCD147_SCLK_PIN),
             mosi=Pin(config.WAVESHARE_LCD147_MOSI_PIN),
@@ -69,11 +78,12 @@ class ST7789WaveshareDisplay(DisplayInterface):
         self._last_update = now
         self._last_shown = shown
 
-        x = self._x_offset
+        x = self._x_offset + _MARGIN_X
+        y = _MARGIN_TOP
         self.tft.fill(BLACK)
         color = GREEN if state == "STREAMING" else WHITE
-        self.tft.text(FONT, "State: {}".format(state), x, 4, color, BLACK)
-        self.tft.text(FONT, "Ctrl:  {}".format(controller_ip or "none"), x, 4 + _LINE_HEIGHT, WHITE, BLACK)
-        self.tft.text(FONT, "Heap:  {}KB".format(heap_free // 1024), x, 4 + 2 * _LINE_HEIGHT, WHITE, BLACK)
+        self.tft.text(FONT, "State: {}".format(state), x, y, color, BLACK)
+        self.tft.text(FONT, "Ctrl:  {}".format(controller_ip or "none"), x, y + _LINE_HEIGHT, WHITE, BLACK)
+        self.tft.text(FONT, "Heap:  {}KB".format(heap_free // 1024), x, y + 2 * _LINE_HEIGHT, WHITE, BLACK)
         if state == "STREAMING":
-            self.tft.text(FONT, "Pkts:  {}".format(packet_count), x, 4 + 3 * _LINE_HEIGHT, YELLOW, BLACK)
+            self.tft.text(FONT, "Pkts:  {}".format(packet_count), x, y + 3 * _LINE_HEIGHT, YELLOW, BLACK)

@@ -30,9 +30,9 @@ TRIGGER_DEBOUNCE_MS = 250
 
 # Waveshare ESP32-S3-LCD-1.47 specific settings (only read by
 # src/display/st7789_waveshare147.py when DISPLAY_DRIVER is set to it).
-# SPI pins sourced from a third-party MicroPython/LVGL config example for
-# this board, NOT yet hardware-verified - run the display bench smoke test
-# before trusting these.
+# Pins + offset bench-verified on real hardware 2026-08-12 (see
+# examples/lcd_smoke_test.py). Note SPI host id 1 is hardcoded in the driver
+# itself, not configurable here - host id 2 hard-crashes this board.
 WAVESHARE_LCD147_MOSI_PIN = 45
 WAVESHARE_LCD147_SCLK_PIN = 40
 WAVESHARE_LCD147_CS_PIN = 42
@@ -40,8 +40,7 @@ WAVESHARE_LCD147_DC_PIN = 41
 WAVESHARE_LCD147_RST_PIN = 39
 WAVESHARE_LCD147_BL_PIN = 48
 # The vendored driver only supports 240x320/240x240/135x240/128x128 controller
-# modes; this panel is a 172px-wide window centered in 240x320 mode. Offset
-# is a centered guess ((240-172)//2) - also unverified, check on first boot.
+# modes; this panel is a 172px-wide window centered in 240x320 mode.
 WAVESHARE_LCD147_X_OFFSET = 34
 
 # BOOT button (GPIO0, only usable software-readable button on this board -
