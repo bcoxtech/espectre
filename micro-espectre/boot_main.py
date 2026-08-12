@@ -2,10 +2,10 @@
 Micro-ESPectre - Control-Plane Boot Entry Point
 
 Deployed to the device root as `main.py` (MicroPython's auto-run entry
-point). Connects WiFi once at power-on, then idles announcing presence via
-heartbeat and waiting for START/STOP commands from the configured control
-host (see src.control) - no serial/USB tether required after this is
-flashed.
+point). Connects WiFi once at power-on, then stays silent until a host
+broadcasts a KNOCK - the knocker becomes the trusted controller for
+START/STOP commands and heartbeats (see src.control) - no serial/USB
+tether required after this is flashed.
 
 Author: Claude Code (for Brennan C)
 License: GPLv3 (matches parent project)
@@ -39,9 +39,11 @@ def main():
             action, arg = cmd
 
             if action == "START":
-                dest_ip = ctl.host
+                dest_ip = ctl.controller
                 if not dest_ip:
-                    print('[control] START ignored: no CONTROL_HOST configured')
+                    # Shouldn't happen: poll_command() only returns START/STOP
+                    # from an already-paired controller.
+                    print('[control] START ignored: no paired controller')
                     continue
                 stop_flag.reset()
                 ctl.set_state(STATE_STREAMING)
