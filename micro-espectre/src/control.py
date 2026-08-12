@@ -95,6 +95,18 @@ class ControlServer:
         except Exception as e:
             print("[control] hello send failed:", e)
 
+    def send_loopback(self, message):
+        """
+        Send a command to this node's own control socket via 127.0.0.1 -
+        used by a local trigger (e.g. the BOOT button) so its presses flow
+        through the exact same poll_command() chokepoint as relay commands,
+        instead of a second parallel start/stop code path.
+        """
+        try:
+            self.sock.sendto(message.encode(), ("127.0.0.1", self.port))
+        except Exception as e:
+            print("[control] loopback send failed:", e)
+
     def maybe_send_heartbeat(self):
         """Send a heartbeat to the paired controller if the interval has elapsed."""
         if not self.controller:
@@ -141,8 +153,11 @@ class ControlServer:
             self._send_hello(sender_ip)
             return None
 
-        # Everything else must come from the paired controller
-        if sender_ip != self.controller:
+        # Everything else must come from the paired controller, or from
+        # loopback (a local trigger, e.g. the BOOT button - see
+        # src/triggers/). Loopback does NOT mutate self.controller, so it
+        # can never hijack pairing away from (or be affected by) a relay.
+        if sender_ip != self.controller and sender_ip != "127.0.0.1":
             print("[control] ignored '{}' from untrusted {} (controller={})".format(
                 cmd, sender_ip, self.controller))
             return None

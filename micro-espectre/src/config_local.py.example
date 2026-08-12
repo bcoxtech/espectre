@@ -23,3 +23,9 @@ MQTT_PASSWORD = "password"
 # IP of the host running the control listener (e.g. espectre_ctl.py on the Pi relay)
 CONTROL_HOST = "192.168.0.7"
 CONTROL_PORT = 5002
+
+# On-device display + local start/stop button (only on boards with the
+# hardware - e.g. Waveshare ESP32-S3-LCD-1.47). Leave both commented out /
+# None on boards without this hardware.
+# DISPLAY_DRIVER = "st7789_waveshare147"
+# TRIGGER_DRIVER = "gpio_button"

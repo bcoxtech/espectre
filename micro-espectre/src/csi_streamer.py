@@ -63,7 +63,8 @@ def detect_chip_code():
     return CHIP_UNKNOWN
 
 
-def _stream_loop(wlan, chip_code, dest_ip, duration_sec=0, stop_flag=None, ctl=None):
+def _stream_loop(wlan, chip_code, dest_ip, duration_sec=0, stop_flag=None, ctl=None,
+                  trigger=None, display=None):
     """
     Core CSI streaming loop over an already-connected wlan.
 
@@ -80,6 +81,12 @@ def _stream_loop(wlan, chip_code, dest_ip, duration_sec=0, stop_flag=None, ctl=N
         ctl: optional src.control.ControlServer - when provided, its socket is
              polled every iteration (non-blocking) for a STOP command, and
              heartbeats keep going out while this loop owns execution
+        trigger: optional src.triggers.base.TriggerInterface - a local
+                 button/etc that can only be caught here, since this loop is
+                 the only thing running while streaming owns execution; a
+                 press sends STOP over loopback via ctl (requires ctl)
+        display: optional src.display.base.DisplayInterface - refreshed with
+                 the same status shown while idle, plus live packet_count
 
     Returns:
         int: number of packets sent
@@ -159,6 +166,17 @@ def _stream_loop(wlan, chip_code, dest_ip, duration_sec=0, stop_flag=None, ctl=N
                 if cmd is not None and cmd[0] == "STOP":
                     print('Streaming stopped by control command')
                     break
+
+            # Local trigger (e.g. BOOT button): send STOP over loopback so
+            # it's picked up by the same ctl.poll_command() chokepoint above
+            # on the next iteration, rather than breaking directly here -
+            # keeps one source of truth for "how streaming stops".
+            if trigger is not None and ctl is not None and trigger.pressed():
+                print('[trigger] press detected - sending loopback STOP')
+                ctl.send_loopback("STOP")
+
+            if display is not None and ctl is not None:
+                display.update(ctl.state, ctl.controller, gc.mem_free(), packet_count)
 
             # Check external stop request (e.g. set programmatically by a caller)
             if stop_flag is not None and stop_flag.stop:
@@ -269,7 +287,8 @@ def stream_csi(dest_ip, duration_sec=0):
         cleanup_wifi(wlan)
 
 
-def stream_with_wlan(wlan, dest_ip, duration_sec=0, stop_flag=None, ctl=None):
+def stream_with_wlan(wlan, dest_ip, duration_sec=0, stop_flag=None, ctl=None,
+                      trigger=None, display=None):
     """
     Stream CSI using an already-connected wlan - does NOT touch the WiFi
     connection. Used by the control-plane boot loop, which needs WiFi to stay
@@ -282,6 +301,8 @@ def stream_with_wlan(wlan, dest_ip, duration_sec=0, stop_flag=None, ctl=None):
         stop_flag: src.control.StopFlag - set .stop = True to interrupt early
         ctl: src.control.ControlServer - polled for STOP + kept heartbeating
              while this call owns the loop
+        trigger: optional src.triggers.base.TriggerInterface - see _stream_loop
+        display: optional src.display.base.DisplayInterface - see _stream_loop
 
     Returns:
         int: number of packets sent
@@ -289,4 +310,5 @@ def stream_with_wlan(wlan, dest_ip, duration_sec=0, stop_flag=None, ctl=None):
     chip_type = os.uname().machine
     chip_code = detect_chip_code()
     print(f'Chip: {chip_type} (code: {chip_code})')
-    return _stream_loop(wlan, chip_code, dest_ip, duration_sec, stop_flag=stop_flag, ctl=ctl)
+    return _stream_loop(wlan, chip_code, dest_ip, duration_sec, stop_flag=stop_flag, ctl=ctl,
+                         trigger=trigger, display=display)

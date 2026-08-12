@@ -18,6 +18,36 @@ WIFI_PASSWORD = "YourPassword"
 CONTROL_HOST = None  # IP of the host running the control listener (e.g. the Pi relay); None disables the control plane
 CONTROL_PORT = 5002
 
+# On-Device Display Configuration (pluggable - see src/display/). Leave
+# DISPLAY_DRIVER = None on boards without a screen.
+DISPLAY_DRIVER = None            # e.g. "st7789_waveshare147"
+DISPLAY_UPDATE_INTERVAL_MS = 750  # rate-limit actual SPI redraws
+
+# Local Start/Stop Trigger Configuration (pluggable - see src/triggers/).
+# Leave TRIGGER_DRIVER = None on boards without a local button.
+TRIGGER_DRIVER = None            # e.g. "gpio_button"
+TRIGGER_DEBOUNCE_MS = 250
+
+# Waveshare ESP32-S3-LCD-1.47 specific settings (only read by
+# src/display/st7789_waveshare147.py when DISPLAY_DRIVER is set to it).
+# SPI pins sourced from a third-party MicroPython/LVGL config example for
+# this board, NOT yet hardware-verified - run the display bench smoke test
+# before trusting these.
+WAVESHARE_LCD147_MOSI_PIN = 45
+WAVESHARE_LCD147_SCLK_PIN = 40
+WAVESHARE_LCD147_CS_PIN = 42
+WAVESHARE_LCD147_DC_PIN = 41
+WAVESHARE_LCD147_RST_PIN = 39
+WAVESHARE_LCD147_BL_PIN = 48
+# The vendored driver only supports 240x320/240x240/135x240/128x128 controller
+# modes; this panel is a 172px-wide window centered in 240x320 mode. Offset
+# is a centered guess ((240-172)//2) - also unverified, check on first boot.
+WAVESHARE_LCD147_X_OFFSET = 34
+
+# BOOT button (GPIO0, only usable software-readable button on this board -
+# RESET is wired to EN/CHIP_PU and can't be read in code).
+GPIO_BUTTON_PIN = 0
+
 # MQTT Configuration
 MQTT_BROKER = "homeassistant.local"  # Your MQTT broker IP
 MQTT_PORT = 1883
