@@ -10,6 +10,7 @@ tether required after this is flashed.
 Author: Claude Code (for Brennan C)
 License: GPLv3 (matches parent project)
 """
+import gc
 import time
 from src.main import connect_wifi, cleanup_wifi
 from src.control import ControlServer, StopFlag, STATE_IDLE, STATE_STREAMING
@@ -53,6 +54,8 @@ def main():
                 except Exception as e:
                     print('[control] stream error:', e)
                 ctl.set_state(STATE_IDLE)
+                gc.collect()
+                print('[control] back to idle, free heap:', gc.mem_free())
 
             elif action == "STOP":
                 # Nothing is actively streaming here (an in-progress stream

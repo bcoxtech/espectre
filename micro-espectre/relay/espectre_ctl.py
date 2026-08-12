@@ -12,24 +12,29 @@ instead of needing to type out MAC addresses - and lets you send
 
 Modes:
     python3 espectre_ctl.py
-        Interactive if stdin is a TTY (list | start <id> [dur] | stop <id> | quit).
-        Daemon-only (discovery log, no stdin) if stdin is NOT a TTY - e.g. under
-        `nohup ... &`. Selecting on a non-TTY stdin busy-loops (EOF makes it
-        always show as ready), so it's deliberately excluded rather than watched.
+        No subcommand: interactive if stdin is a TTY (list | start <id> [dur]
+        | stop <id> | quit), daemon-only (discovery log, no stdin) otherwise -
+        e.g. under `nohup ... &`. Selecting on a non-TTY stdin busy-loops (EOF
+        makes it always show as ready), so it's deliberately excluded rather
+        than watched.
 
-    python3 espectre_ctl.py --send <node_id|mac|ip> START [duration]
-    python3 espectre_ctl.py --send <node_id|mac|ip> STOP
-        One-shot: broadcast a few KNOCKs to (re)discover, send the command,
-        exit. Good for scripting/testing without a long-running daemon.
-
-    python3 espectre_ctl.py --knock [timeout_sec]
+    python3 espectre_ctl.py knock [timeout_sec]
         One-shot: broadcast discovery for `timeout_sec` (default 5), print
         every board that replied, exit.
 
-    python3 espectre_ctl.py --list
+    python3 espectre_ctl.py list
         One-shot: print the last-known cache (from .nodes.json) with no
-        network activity - fast, but can be stale; run --knock to refresh.
+        network activity - fast, but can be stale; run `knock` to refresh.
+
+    python3 espectre_ctl.py send <node_id|mac|ip> START [duration]
+    python3 espectre_ctl.py send <node_id|mac|ip> STOP
+        One-shot: broadcast a few KNOCKs to (re)discover, send the command,
+        exit. Good for scripting/testing without a long-running daemon.
+
+Subcommand names deliberately match `me knock` / `me list` / `me start` /
+`me stop` (the equivalent commands when run through the full `me` CLI).
 """
+import argparse
 import json
 import socket
 import select
@@ -212,7 +217,7 @@ def run_daemon(interactive):
         print("Commands: list | start <node_id|mac|ip> [duration] | stop <node_id|mac|ip> | quit")
         print_prompt()
     else:
-        print("(non-interactive stdin - daemon mode, discovery log only; use --send to issue commands)")
+        print("(non-interactive stdin - daemon mode, discovery log only; use the 'send' subcommand to issue commands)")
 
     watch = [sock, sys.stdin] if interactive else [sock]
     last_knock = 0.0
@@ -251,20 +256,38 @@ def run_daemon(interactive):
                 print_prompt()
 
 
+def build_parser():
+    parser = argparse.ArgumentParser(
+        prog="espectre_ctl.py",
+        description=__doc__,
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+    subparsers = parser.add_subparsers(dest="command")
+
+    knock_parser = subparsers.add_parser("knock", help="Broadcast discovery, print responding boards, exit")
+    knock_parser.add_argument("timeout", type=float, nargs="?", default=5.0,
+                               help="Discovery window in seconds (default: 5.0)")
+
+    subparsers.add_parser("list", help="Print the last-known cache, no network activity")
+
+    send_parser = subparsers.add_parser("send", help="Discover one board (if needed) and send it a command")
+    send_parser.add_argument("identifier", help="Node ID, MAC, or IP")
+    send_parser.add_argument("cmd", nargs="+", help="START [duration_sec] | STOP")
+
+    return parser
+
+
 if __name__ == "__main__":
     try:
-        if len(sys.argv) > 1 and sys.argv[1] == "--send":
-            if len(sys.argv) < 4:
-                print("usage: espectre_ctl.py --send <node_id|mac|ip> START [duration] | STOP")
-                sys.exit(1)
-            run_one_shot(sys.argv[2], sys.argv[3:])
-        elif len(sys.argv) > 1 and sys.argv[1] == "--knock":
-            timeout = float(sys.argv[2]) if len(sys.argv) > 2 else 5.0
-            print(f"knocking for {timeout}s...")
-            discover_all(timeout=timeout, verbose=False)
+        args = build_parser().parse_args()
+        if args.command == "knock":
+            print(f"knocking for {args.timeout}s...")
+            discover_all(timeout=args.timeout, verbose=False)
             print_list()
-        elif len(sys.argv) > 1 and sys.argv[1] == "--list":
+        elif args.command == "list":
             print_list()
+        elif args.command == "send":
+            run_one_shot(args.identifier, args.cmd)
         else:
             run_daemon(interactive=sys.stdin.isatty())
     except KeyboardInterrupt:
