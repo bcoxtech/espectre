@@ -43,7 +43,7 @@ import time
 from pathlib import Path
 
 PORT = 5002
-BROADCAST_ADDR = "192.168.0.255"  # isolated segment, /24
+BROADCAST_ADDR = "192.168.50.255"  # isolated segment, /24
 KNOCK_INTERVAL_SEC = 5
 STALE_AFTER_SEC = 20  # drop a node from "live" listing if no heartbeat in this long
 
