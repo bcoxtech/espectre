@@ -29,6 +29,7 @@ Usage:
 Author: Hadi (hadikurniawanar@gmail.com)
 License: GPLv3
 """
+
 import sys
 import json
 import argparse
@@ -44,7 +45,7 @@ SCRIPT_DIR = Path(__file__).resolve().parent
 SRC_DIR = SCRIPT_DIR.parent / "src"
 sys.path.insert(0, str(SRC_DIR))
 
-from utils import (                                      # noqa: E402
+from utils import (  # noqa: E402
     calculate_spatial_turbulence as _src_spatial_turbulence,
     calculate_moving_variance as _src_moving_variance,
 )
@@ -69,6 +70,7 @@ MIN_AMPLITUDE_MEAN = 10.0
 # Vectorized amplitude extraction (avoids per-packet Python loops)
 # ------------------------------------------------------------------
 
+
 def _extract_amplitudes_matrix(csi_matrix):
     """Extract amplitudes for all packets at once using numpy.
 
@@ -90,6 +92,7 @@ def _extract_amplitudes_matrix(csi_matrix):
 # ------------------------------------------------------------------
 # Wrappers for src/ functions
 # ------------------------------------------------------------------
+
 
 def _spatial_turbulence_from_amps(amplitudes, band, use_cv_normalization=False):
     """Compute spatial turbulence from a pre-extracted amplitude list.
@@ -116,6 +119,7 @@ def _moving_variance(values, window_size=None):
 # Validation checks
 # ------------------------------------------------------------------
 
+
 class ValidationResult:
     """Single validation check result."""
 
@@ -126,7 +130,7 @@ class ValidationResult:
         self.value = value
 
     def __repr__(self):
-        icon = {'PASS': '✅', 'WARN': '⚠️', 'FAIL': '❌'}[self.status]
+        icon = {"PASS": "✅", "WARN": "⚠️", "FAIL": "❌"}[self.status]
         val_str = f" ({self.value})" if self.value is not None else ""
         return f"{icon} {self.name}: {self.message}{val_str}"
 
@@ -134,10 +138,10 @@ class ValidationResult:
 def _get_csi_key(data):
     """Return the key for CSI data inside an NpzFile."""
     keys = list(data.keys())
-    if 'csi_data' in keys:
-        return 'csi_data'
-    if 'csi' in keys:
-        return 'csi'
+    if "csi_data" in keys:
+        return "csi_data"
+    if "csi" in keys:
+        return "csi"
     return keys[0] if keys else None
 
 
@@ -159,12 +163,10 @@ def validate_file_integrity(filepath):
         return results, None
 
     csi = data[csi_key]
-    if csi_key in ('csi_data', 'csi'):
-        results.append(ValidationResult("csi_key", "PASS",
-            f"CSI data found (key: {csi_key})", f"shape={csi.shape}"))
+    if csi_key in ("csi_data", "csi"):
+        results.append(ValidationResult("csi_key", "PASS", f"CSI data found (key: {csi_key})", f"shape={csi.shape}"))
     else:
-        results.append(ValidationResult("csi_key", "WARN",
-            f"Using first key as CSI: {csi_key}", f"shape={csi.shape}"))
+        results.append(ValidationResult("csi_key", "WARN", f"Using first key as CSI: {csi_key}", f"shape={csi.shape}"))
 
     return results, data
 
@@ -177,39 +179,41 @@ def validate_signal_quality(csi_data):
 
     # Packet count
     if num_packets < MIN_PACKETS:
-        results.append(ValidationResult("packet_count", "FAIL",
-            f"Too few packets: {num_packets} < {MIN_PACKETS}", num_packets))
+        results.append(
+            ValidationResult("packet_count", "FAIL", f"Too few packets: {num_packets} < {MIN_PACKETS}", num_packets)
+        )
     else:
-        results.append(ValidationResult("packet_count", "PASS",
-            f"{num_packets} packets", num_packets))
+        results.append(ValidationResult("packet_count", "PASS", f"{num_packets} packets", num_packets))
 
     # Zero-packet detection (vectorized)
     zero_packets = int(np.all(csi_data == 0, axis=1).sum())
     zero_ratio = zero_packets / num_packets if num_packets > 0 else 0
     if zero_ratio > MAX_ZERO_PACKET_RATIO:
-        results.append(ValidationResult("zero_packets", "WARN",
-            f"Zero-packet ratio: {zero_ratio:.4f} ({zero_packets}/{num_packets})", zero_ratio))
+        results.append(
+            ValidationResult(
+                "zero_packets",
+                "WARN",
+                f"Zero-packet ratio: {zero_ratio:.4f} ({zero_packets}/{num_packets})",
+                zero_ratio,
+            )
+        )
     else:
-        results.append(ValidationResult("zero_packets", "PASS",
-            f"Zero-packet ratio: {zero_ratio:.4f}", zero_ratio))
+        results.append(ValidationResult("zero_packets", "PASS", f"Zero-packet ratio: {zero_ratio:.4f}", zero_ratio))
 
     # Mean amplitude check (vectorized, first 100 packets)
-    sample = csi_data[:min(100, num_packets)]
+    sample = csi_data[: min(100, num_packets)]
     amps = _extract_amplitudes_matrix(sample)
     mean_amp = float(amps.mean()) if amps.size > 0 else 0.0
 
     if mean_amp < MIN_AMPLITUDE_MEAN:
-        results.append(ValidationResult("signal_level", "WARN",
-            f"Low mean amplitude: {mean_amp:.2f}", mean_amp))
+        results.append(ValidationResult("signal_level", "WARN", f"Low mean amplitude: {mean_amp:.2f}", mean_amp))
     else:
-        results.append(ValidationResult("signal_level", "PASS",
-            f"Mean amplitude: {mean_amp:.2f}", mean_amp))
+        results.append(ValidationResult("signal_level", "PASS", f"Mean amplitude: {mean_amp:.2f}", mean_amp))
 
     return results
 
 
-def validate_pair(bl_csi, mv_csi, bl_data, mv_data,
-                  subcarriers=None, gain_locked=True):
+def validate_pair(bl_csi, mv_csi, bl_data, mv_data, subcarriers=None, gain_locked=True):
     """Validate a baseline/movement pair.
 
     Args:
@@ -235,12 +239,10 @@ def validate_pair(bl_csi, mv_csi, bl_data, mv_data,
     mv_amps = _extract_amplitudes_matrix(mv_csi)
 
     bl_turbulence = [
-        _spatial_turbulence_from_amps(bl_amps[i].tolist(), subcarriers, use_cv)
-        for i in range(bl_amps.shape[0])
+        _spatial_turbulence_from_amps(bl_amps[i].tolist(), subcarriers, use_cv) for i in range(bl_amps.shape[0])
     ]
     mv_turbulence = [
-        _spatial_turbulence_from_amps(mv_amps[i].tolist(), subcarriers, use_cv)
-        for i in range(mv_amps.shape[0])
+        _spatial_turbulence_from_amps(mv_amps[i].tolist(), subcarriers, use_cv) for i in range(mv_amps.shape[0])
     ]
 
     bl_mv = _moving_variance(bl_turbulence)
@@ -249,28 +251,40 @@ def validate_pair(bl_csi, mv_csi, bl_data, mv_data,
     bl_var = np.mean(bl_mv) if bl_mv else 0
     mv_var = np.mean(mv_mv) if mv_mv else 0
 
-    ratio = mv_var / bl_var if bl_var > 1e-10 else float('inf')
+    ratio = mv_var / bl_var if bl_var > 1e-10 else float("inf")
     # Keep threshold check aligned with displayed ratio precision.
     ratio_for_check = float(f"{ratio:.2f}") if np.isfinite(ratio) else ratio
 
     if ratio_for_check < MIN_VARIANCE_RATIO:
-        results.append(ValidationResult("variance_ratio", "FAIL",
-            f"Ratio {ratio_for_check}x < {MIN_VARIANCE_RATIO}x (bl={bl_var:.4f}, mv={mv_var:.4f})", ratio_for_check))
+        results.append(
+            ValidationResult(
+                "variance_ratio",
+                "FAIL",
+                f"Ratio {ratio_for_check}x < {MIN_VARIANCE_RATIO}x (bl={bl_var:.4f}, mv={mv_var:.4f})",
+                ratio_for_check,
+            )
+        )
     else:
-        results.append(ValidationResult("variance_ratio", "PASS",
-            f"Ratio {ratio_for_check}x (bl={bl_var:.6f}, mv={mv_var:.6f})", ratio_for_check))
+        results.append(
+            ValidationResult(
+                "variance_ratio",
+                "PASS",
+                f"Ratio {ratio_for_check}x (bl={bl_var:.6f}, mv={mv_var:.6f})",
+                ratio_for_check,
+            )
+        )
 
     # Temporal gap: baseline end → movement start
     gap_s = None
     try:
-        bl_collected = bl_data.get('collected_at', None)
-        mv_collected = mv_data.get('collected_at', None)
-        bl_duration = bl_data.get('duration_ms', None)
+        bl_collected = bl_data.get("collected_at", None)
+        mv_collected = mv_data.get("collected_at", None)
+        bl_duration = bl_data.get("duration_ms", None)
 
         if bl_collected is not None and mv_collected is not None and bl_duration is not None:
-            bl_collected_str = str(bl_collected.item() if hasattr(bl_collected, 'item') else bl_collected)
-            mv_collected_str = str(mv_collected.item() if hasattr(mv_collected, 'item') else mv_collected)
-            bl_duration_val = float(bl_duration.item() if hasattr(bl_duration, 'item') else bl_duration)
+            bl_collected_str = str(bl_collected.item() if hasattr(bl_collected, "item") else bl_collected)
+            mv_collected_str = str(mv_collected.item() if hasattr(mv_collected, "item") else mv_collected)
+            bl_duration_val = float(bl_duration.item() if hasattr(bl_duration, "item") else bl_duration)
 
             bl_start = datetime.datetime.fromisoformat(bl_collected_str)
             mv_start = datetime.datetime.fromisoformat(mv_collected_str)
@@ -279,17 +293,15 @@ def validate_pair(bl_csi, mv_csi, bl_data, mv_data,
             gap_s = (mv_start - bl_end).total_seconds()
 
             if gap_s > MAX_TEMPORAL_GAP_S:
-                results.append(ValidationResult("temporal_gap", "WARN",
-                    f"Large gap: {gap_s:.1f}s > {MAX_TEMPORAL_GAP_S}s", gap_s))
+                results.append(
+                    ValidationResult("temporal_gap", "WARN", f"Large gap: {gap_s:.1f}s > {MAX_TEMPORAL_GAP_S}s", gap_s)
+                )
             elif gap_s < 0:
-                results.append(ValidationResult("temporal_gap", "WARN",
-                    f"Negative gap (overlap): {gap_s:.1f}s", gap_s))
+                results.append(ValidationResult("temporal_gap", "WARN", f"Negative gap (overlap): {gap_s:.1f}s", gap_s))
             else:
-                results.append(ValidationResult("temporal_gap", "PASS",
-                    f"Gap: {gap_s:.1f}s", gap_s))
+                results.append(ValidationResult("temporal_gap", "PASS", f"Gap: {gap_s:.1f}s", gap_s))
     except Exception:
-        results.append(ValidationResult("temporal_gap", "WARN",
-            "Could not parse collected_at/duration_ms timestamps"))
+        results.append(ValidationResult("temporal_gap", "WARN", "Could not parse collected_at/duration_ms timestamps"))
 
     # Return the same ratio value used by PASS/FAIL checks and logs.
     return results, bl_var, mv_var, ratio_for_check, gap_s
@@ -299,38 +311,58 @@ def validate_ml_readiness(dataset_info):
     """Check if dataset is ready for ML training."""
     results = []
 
-    baseline_files = dataset_info.get('files', {}).get('baseline', [])
-    movement_files = dataset_info.get('files', {}).get('movement', [])
+    baseline_files = dataset_info.get("files", {}).get("baseline", [])
+    movement_files = dataset_info.get("files", {}).get("movement", [])
 
-    bl_packets = sum(f.get('num_packets', 0) for f in baseline_files)
-    mv_packets = sum(f.get('num_packets', 0) for f in movement_files)
+    bl_packets = sum(f.get("num_packets", 0) for f in baseline_files)
+    mv_packets = sum(f.get("num_packets", 0) for f in movement_files)
     total = bl_packets + mv_packets
 
     if total > 0:
         bl_ratio = bl_packets / total
         if 0.3 <= bl_ratio <= 0.7:
-            results.append(ValidationResult("label_balance", "PASS",
-                f"Balance: {bl_ratio:.1%} baseline, {1-bl_ratio:.1%} movement", bl_ratio))
+            results.append(
+                ValidationResult(
+                    "label_balance", "PASS", f"Balance: {bl_ratio:.1%} baseline, {1 - bl_ratio:.1%} movement", bl_ratio
+                )
+            )
         else:
-            results.append(ValidationResult("label_balance", "WARN",
-                f"Imbalanced: {bl_ratio:.1%} baseline, {1-bl_ratio:.1%} movement", bl_ratio))
+            results.append(
+                ValidationResult(
+                    "label_balance",
+                    "WARN",
+                    f"Imbalanced: {bl_ratio:.1%} baseline, {1 - bl_ratio:.1%} movement",
+                    bl_ratio,
+                )
+            )
 
     min_windows = 1000
     estimated_windows = max(0, bl_packets - 100) + max(0, mv_packets - 100)
     if estimated_windows < min_windows:
-        results.append(ValidationResult("sample_count", "WARN",
-            f"Low sample count: ~{estimated_windows} windows (target: {min_windows}+)", estimated_windows))
+        results.append(
+            ValidationResult(
+                "sample_count",
+                "WARN",
+                f"Low sample count: ~{estimated_windows} windows (target: {min_windows}+)",
+                estimated_windows,
+            )
+        )
     else:
-        results.append(ValidationResult("sample_count", "PASS",
-            f"~{estimated_windows} feature windows available", estimated_windows))
+        results.append(
+            ValidationResult(
+                "sample_count", "PASS", f"~{estimated_windows} feature windows available", estimated_windows
+            )
+        )
 
-    chips = {f.get('chip', 'unknown') for f in baseline_files + movement_files}
+    chips = {f.get("chip", "unknown") for f in baseline_files + movement_files}
     if len(chips) >= 3:
-        results.append(ValidationResult("chip_diversity", "PASS",
-            f"{len(chips)} chip types: {sorted(chips)}", len(chips)))
+        results.append(
+            ValidationResult("chip_diversity", "PASS", f"{len(chips)} chip types: {sorted(chips)}", len(chips))
+        )
     else:
-        results.append(ValidationResult("chip_diversity", "WARN",
-            f"Only {len(chips)} chip type(s): {sorted(chips)}", len(chips)))
+        results.append(
+            ValidationResult("chip_diversity", "WARN", f"Only {len(chips)} chip type(s): {sorted(chips)}", len(chips))
+        )
 
     return results
 
@@ -338,6 +370,7 @@ def validate_ml_readiness(dataset_info):
 # ------------------------------------------------------------------
 # Main validation pipeline
 # ------------------------------------------------------------------
+
 
 def run_validation(chip_filter=None, strict=False, generate_report=False):
     """Run full dataset validation."""
@@ -358,7 +391,7 @@ def run_validation(chip_filter=None, strict=False, generate_report=False):
         print(f"📋 Loaded dataset_info.json (updated: {dataset_info.get('updated_at', 'unknown')})")
     else:
         print("⚠️  dataset_info.json not found, scanning files directly")
-        dataset_info = {'files': {'baseline': [], 'movement': []}}
+        dataset_info = {"files": {"baseline": [], "movement": []}}
 
     all_results = []
     pair_results = []
@@ -373,7 +406,7 @@ def run_validation(chip_filter=None, strict=False, generate_report=False):
     # Cache: path -> (NpzFile, csi_key) — avoids reloading in pair validation
     npz_cache = {}
 
-    for label in ['baseline', 'movement']:
+    for label in ["baseline", "movement"]:
         label_dir = DATA_DIR / label
         if not label_dir.exists():
             print(f"\n⚠️  Directory not found: {label_dir}")
@@ -420,23 +453,21 @@ def run_validation(chip_filter=None, strict=False, generate_report=False):
 
             Filenames follow: label_chip_64sc_YYYYMMDD_HHMMSS.npz
             """
-            parts = filepath.stem.split('_')
-            chip = parts[1] if len(parts) > 1 else 'unknown'
+            parts = filepath.stem.split("_")
+            chip = parts[1] if len(parts) > 1 else "unknown"
             try:
-                dt = datetime.datetime.strptime(
-                    f"{parts[3]}_{parts[4]}", "%Y%m%d_%H%M%S"
-                )
+                dt = datetime.datetime.strptime(f"{parts[3]}_{parts[4]}", "%Y%m%d_%H%M%S")
             except (IndexError, ValueError):
                 dt = None
             return chip, dt
 
         # Build gain-lock lookup from dataset_info.json
         gain_locked_map = {}
-        for label in ('baseline', 'movement'):
-            for entry in dataset_info.get('files', {}).get(label, []):
-                fname = entry['filename']
-                if 'gain_locked' in entry:
-                    gain_locked_map[fname] = entry['gain_locked']
+        for label in ("baseline", "movement"):
+            for entry in dataset_info.get("files", {}).get(label, []):
+                fname = entry["filename"]
+                if "gain_locked" in entry:
+                    gain_locked_map[fname] = entry["gain_locked"]
 
         # Match each baseline to its closest same-chip movement file,
         # producing 1:1 pairs.
@@ -498,8 +529,10 @@ def run_validation(chip_filter=None, strict=False, generate_report=False):
                     continue
 
             pair_res, bl_var, mv_var, ratio, gap_s = validate_pair(
-                bl_data[bl_key], mv_data[mv_key],
-                bl_data, mv_data,
+                bl_data[bl_key],
+                mv_data[mv_key],
+                bl_data,
+                mv_data,
                 subcarriers=pair_sc,
                 gain_locked=pair_gain_locked,
             )
@@ -507,18 +540,20 @@ def run_validation(chip_filter=None, strict=False, generate_report=False):
                 print(f"   {r}")
                 all_results.append(r)
 
-            pair_results.append({
-                'baseline': bl_file.name,
-                'movement': mv_file.name,
-                'chip': chip.upper(),
-                'bl_var': bl_var,
-                'mv_var': mv_var,
-                'ratio': ratio,
-                'gap_s': gap_s,
-                'sc_source': sc_source,
-                'cv_mode': cv_mode,
-                'status': 'PASS' if ratio >= MIN_VARIANCE_RATIO else 'FAIL'
-            })
+            pair_results.append(
+                {
+                    "baseline": bl_file.name,
+                    "movement": mv_file.name,
+                    "chip": chip.upper(),
+                    "bl_var": bl_var,
+                    "mv_var": mv_var,
+                    "ratio": ratio,
+                    "gap_s": gap_s,
+                    "sc_source": sc_source,
+                    "cv_mode": cv_mode,
+                    "status": "PASS" if ratio >= MIN_VARIANCE_RATIO else "FAIL",
+                }
+            )
 
     # ------------------------------------------------------------------
     # Phase 3: ML readiness
@@ -535,9 +570,9 @@ def run_validation(chip_filter=None, strict=False, generate_report=False):
     # ------------------------------------------------------------------
     # Summary
     # ------------------------------------------------------------------
-    pass_count = sum(1 for r in all_results if r.status == 'PASS')
-    warn_count = sum(1 for r in all_results if r.status == 'WARN')
-    fail_count = sum(1 for r in all_results if r.status == 'FAIL')
+    pass_count = sum(1 for r in all_results if r.status == "PASS")
+    warn_count = sum(1 for r in all_results if r.status == "WARN")
+    fail_count = sum(1 for r in all_results if r.status == "FAIL")
 
     print("\n" + "=" * 70)
     print("  SUMMARY")
@@ -548,7 +583,7 @@ def run_validation(chip_filter=None, strict=False, generate_report=False):
     print(f"   Total checks: {len(all_results)}")
 
     if pair_results:
-        pass_pairs = sum(1 for p in pair_results if p['status'] == 'PASS')
+        pass_pairs = sum(1 for p in pair_results if p["status"] == "PASS")
         print(f"   Pairs: {pass_pairs}/{len(pair_results)} passed")
 
     if generate_report:
@@ -584,19 +619,23 @@ def _generate_report(pair_results, all_results, dataset_info):
     lines.append("- `Ratio`: `Movement Var / Baseline Var`")
     lines.append("- `Gap end->start`: time between baseline end and movement start (negative means overlap)")
     lines.append("- `Subcarriers`: `DEFAULT_SUBCARRIERS` = fixed production default set")
-    lines.append("- `Turbulence`: `raw_std` = gain locked (raw standard deviation), "
-                 "`CV` = gain not locked (coefficient of variation, MVS only — ML always uses raw_std)\n")
+    lines.append(
+        "- `Turbulence`: `raw_std` = gain locked (raw standard deviation), "
+        "`CV` = gain not locked (coefficient of variation, MVS only — ML always uses raw_std)\n"
+    )
 
     lines.append("## Results (sorted by chip, then ratio desc)\n")
-    lines.append("| Chip | File pair (baseline / movement) | Baseline Var | Movement Var "
-                 "| Ratio | Gap | Subcarriers | Turbulence | Status |")
+    lines.append(
+        "| Chip | File pair (baseline / movement) | Baseline Var | Movement Var "
+        "| Ratio | Gap | Subcarriers | Turbulence | Status |"
+    )
     lines.append("|---|---|---:|---:|---:|---:|---|---|---|")
 
-    sorted_pairs = sorted(pair_results, key=lambda x: (x['chip'], -x['ratio']))
+    sorted_pairs = sorted(pair_results, key=lambda x: (x["chip"], -x["ratio"]))
     for p in sorted_pairs:
-        bl_var_str = f"{p['bl_var']:.2e}" if p['bl_var'] < 0.01 else f"{p['bl_var']:.2f}"
-        mv_var_str = f"{p['mv_var']:.2e}" if p['mv_var'] < 0.01 else f"{p['mv_var']:.2f}"
-        gap = p.get('gap_s')
+        bl_var_str = f"{p['bl_var']:.2e}" if p["bl_var"] < 0.01 else f"{p['bl_var']:.2f}"
+        mv_var_str = f"{p['mv_var']:.2e}" if p["mv_var"] < 0.01 else f"{p['mv_var']:.2f}"
+        gap = p.get("gap_s")
         gap_str = f"{gap:.1f}s" if gap is not None else "N/A"
         lines.append(
             f"| {p['chip']} | `{p['baseline']}` / `{p['movement']}` | "
@@ -605,28 +644,29 @@ def _generate_report(pair_results, all_results, dataset_info):
         )
 
     lines.append(f"\n## Summary\n")
-    pass_pairs = sum(1 for p in pair_results if p['status'] == 'PASS')
-    fail_pairs = sum(1 for p in pair_results if p['status'] == 'FAIL')
+    pass_pairs = sum(1 for p in pair_results if p["status"] == "PASS")
+    fail_pairs = sum(1 for p in pair_results if p["status"] == "FAIL")
     lines.append(f"- total pairs: {len(pair_results)}")
     lines.append(f"- pass: {pass_pairs}")
     lines.append(f"- fail: {fail_pairs}")
 
-    pass_count = sum(1 for r in all_results if r.status == 'PASS')
-    warn_count = sum(1 for r in all_results if r.status == 'WARN')
-    fail_count = sum(1 for r in all_results if r.status == 'FAIL')
+    pass_count = sum(1 for r in all_results if r.status == "PASS")
+    warn_count = sum(1 for r in all_results if r.status == "WARN")
+    fail_count = sum(1 for r in all_results if r.status == "FAIL")
     lines.append(f"\n## Detailed Check Summary\n")
     lines.append(f"- Total checks: {len(all_results)}")
     lines.append(f"- ✅ PASS: {pass_count}")
     lines.append(f"- ⚠️ WARN: {warn_count}")
     lines.append(f"- ❌ FAIL: {fail_count}")
 
-    with open(REPORT_OUTPUT, 'w') as f:
-        f.write('\n'.join(lines) + '\n')
+    with open(REPORT_OUTPUT, "w") as f:
+        f.write("\n".join(lines) + "\n")
 
 
 # ------------------------------------------------------------------
 # CLI
 # ------------------------------------------------------------------
+
 
 def main():
     parser = argparse.ArgumentParser(
@@ -638,24 +678,17 @@ Examples:
   python 11_validate_dataset_quality.py --chip C6    # Validate C6 only
   python 11_validate_dataset_quality.py --report     # Generate markdown report
   python 11_validate_dataset_quality.py --strict     # Fail on warnings
-        """
+        """,
     )
-    parser.add_argument('--chip', type=str, default=None,
-                       help='Filter by chip type (e.g., C6, S3, C3, ESP32)')
-    parser.add_argument('--report', action='store_true',
-                       help='Generate DATASET_QUALITY_CHECK.md report')
-    parser.add_argument('--strict', action='store_true',
-                       help='Treat warnings as failures')
+    parser.add_argument("--chip", type=str, default=None, help="Filter by chip type (e.g., C6, S3, C3, ESP32)")
+    parser.add_argument("--report", action="store_true", help="Generate DATASET_QUALITY_CHECK.md report")
+    parser.add_argument("--strict", action="store_true", help="Treat warnings as failures")
 
     args = parser.parse_args()
 
-    exit_code = run_validation(
-        chip_filter=args.chip,
-        strict=args.strict,
-        generate_report=args.report
-    )
+    exit_code = run_validation(chip_filter=args.chip, strict=args.strict, generate_report=args.report)
     sys.exit(exit_code)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

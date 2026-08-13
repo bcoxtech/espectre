@@ -24,6 +24,7 @@ different ESP32-S3 board/firmware, don't assume id 2 is safe to try first.
 Author: Claude Code (for Brennan C)
 License: GPLv3 (matches parent project)
 """
+
 import time
 import gc
 from machine import Pin, SPI

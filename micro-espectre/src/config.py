@@ -4,6 +4,7 @@ Micro-ESPectre Configuration
 Author: Francesco Pace <francesco.pace@gmail.com>
 License: GPLv3
 """
+
 import sys
 
 # WiFi Configuration
@@ -20,12 +21,12 @@ CONTROL_PORT = 5002
 
 # On-Device Display Configuration (pluggable - see src/display/). Leave
 # DISPLAY_DRIVER = None on boards without a screen.
-DISPLAY_DRIVER = None            # e.g. "st7789_waveshare147"
+DISPLAY_DRIVER = None  # e.g. "st7789_waveshare147"
 DISPLAY_UPDATE_INTERVAL_MS = 750  # rate-limit actual SPI redraws
 
 # Local Start/Stop Trigger Configuration (pluggable - see src/triggers/).
 # Leave TRIGGER_DRIVER = None on boards without a local button.
-TRIGGER_DRIVER = None            # e.g. "gpio_button"
+TRIGGER_DRIVER = None  # e.g. "gpio_button"
 TRIGGER_DEBOUNCE_MS = 250
 
 # Waveshare ESP32-S3-LCD-1.47 specific settings (only read by
@@ -59,10 +60,10 @@ MQTT_PASSWORD = "mqtt"
 # Generates WiFi traffic to ensure continuous CSI data
 TRAFFIC_GENERATOR_RATE = 100  # Default rate (packets per second, recommended: 100)
 TRAFFIC_GENERATOR_MODE = "ping"  # Default mode: "ping" or "dns"
-PUBLISH_INTERVAL = 100        # Packets between periodic MQTT/log updates
-EVALUATION_INTERVAL = 25      # Packets between internal detector evaluations
-MOTION_ON_HITS = 3            # Consecutive evaluated hits required for IDLE -> MOTION
-MOTION_OFF_HITS = 3           # Consecutive evaluated hits required for MOTION -> IDLE
+PUBLISH_INTERVAL = 100  # Packets between periodic MQTT/log updates
+EVALUATION_INTERVAL = 25  # Packets between internal detector evaluations
+MOTION_ON_HITS = 3  # Consecutive evaluated hits required for IDLE -> MOTION
+MOTION_OFF_HITS = 3  # Consecutive evaluated hits required for MOTION -> IDLE
 
 # CSI Configuration
 CSI_BUFFER_SIZE = 8  # Circular buffer size (used to store csi packets until processed)
@@ -71,13 +72,13 @@ CSI_BUFFER_SIZE = 8  # Circular buffer size (used to store csi packets until pro
 DEFAULT_SUBCARRIERS = [12, 14, 16, 18, 20, 24, 28, 36, 40, 44, 48, 52]
 
 # Selected subcarriers for turbulence calculation. None to auto-calibrate at boot.
-#SELECTED_SUBCARRIERS = [11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22]
+# SELECTED_SUBCARRIERS = [11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22]
 
 # Gain Lock Configuration
 # Controls AGC/FFT gain locking for stable CSI amplitudes
 # Modes: "auto" (skip if signal too strong), "enabled" (always lock), "disabled" (never lock)
-GAIN_LOCK_MODE = "auto"       # Recommended: "auto" - skips gain lock if AGC < 30
-GAIN_LOCK_MIN_SAFE_AGC = 30   # Minimum safe AGC value (below this, gain lock is skipped in auto mode)
+GAIN_LOCK_MODE = "auto"  # Recommended: "auto" - skips gain lock if AGC < 30
+GAIN_LOCK_MIN_SAFE_AGC = 30  # Minimum safe AGC value (below this, gain lock is skipped in auto mode)
 
 # Detection Algorithm
 # "mvs" (default): Moving Variance Segmentation - fast, good accuracy
@@ -86,7 +87,7 @@ DETECTION_ALGORITHM = "mvs"
 
 # Band Calibration Configuration (used when SELECTED_SUBCARRIERS is None)
 # NBVI: Normalized Band Variance Index (12 non-consecutive subcarriers)
-CALIBRATION_NUM_WINDOWS = 10   # Number of windows worth of packets to collect
+CALIBRATION_NUM_WINDOWS = 10  # Number of windows worth of packets to collect
 # CALIBRATION_BUFFER_SIZE calculated after SEG_WINDOW_SIZE is defined
 
 # Segmentation Parameters
@@ -95,37 +96,38 @@ CALIBRATION_NUM_WINDOWS = 10   # Number of windows worth of packets to collect
 #   - "min": maximum sensitivity (may have false positives)
 #   - a number (0.0-10.0): fixed manual threshold
 SEG_THRESHOLD = "auto"
-SEG_WINDOW_SIZE = 100         # Moving variance window (packets) - used by both MVS and Features
-SEG_WINDOW_SIZE_MIN = 10      # Minimum window size
-SEG_WINDOW_SIZE_MAX = 200     # Maximum window size
+SEG_WINDOW_SIZE = 100  # Moving variance window (packets) - used by both MVS and Features
+SEG_WINDOW_SIZE_MIN = 10  # Minimum window size
+SEG_WINDOW_SIZE_MAX = 200  # Maximum window size
 
 # Calibration buffer size = number of windows * window size
 CALIBRATION_BUFFER_SIZE = CALIBRATION_NUM_WINDOWS * SEG_WINDOW_SIZE
 
 # Low-pass filter (removes high-frequency noise, reduces false positives)
-ENABLE_LOWPASS_FILTER = False   # Recommended: reduces FP in noisy environments
-LOWPASS_CUTOFF = 11.0          # Cutoff frequency in Hz (11 Hz: 2.3% FP, 92.4% Recall)
-                               # Human movement is typically 0.5-10 Hz, RF noise is >15 Hz
+ENABLE_LOWPASS_FILTER = False  # Recommended: reduces FP in noisy environments
+LOWPASS_CUTOFF = 11.0  # Cutoff frequency in Hz (11 Hz: 2.3% FP, 92.4% Recall)
+# Human movement is typically 0.5-10 Hz, RF noise is >15 Hz
 
 # Hampel filter (removes outliers/spikes in turbulence)
-ENABLE_HAMPEL_FILTER = True    # Enable/disable Hampel outlier filter (spikes in turbulence)
-HAMPEL_WINDOW = 7             # Window size for median calculation (3-11)
-HAMPEL_THRESHOLD = 5.0        # Outlier detection threshold in MAD units (2.0-6.0 recommended)
-                              # Higher values = less aggressive filtering
+ENABLE_HAMPEL_FILTER = True  # Enable/disable Hampel outlier filter (spikes in turbulence)
+HAMPEL_WINDOW = 7  # Window size for median calculation (3-11)
+HAMPEL_THRESHOLD = 5.0  # Outlier detection threshold in MAD units (2.0-6.0 recommended)
+# Higher values = less aggressive filtering
 
 # HT20 Constants (64 subcarriers - do not change)
-NUM_SUBCARRIERS = 64           # HT20: 64 subcarriers
-EXPECTED_CSI_LEN = 128         # 64 SC × 2 bytes (I/Q pairs)
-GUARD_BAND_LOW = 11            # First valid subcarrier
-GUARD_BAND_HIGH = 52           # Last valid subcarrier  
-DC_SUBCARRIER = 32             # DC null subcarrier
-BAND_SIZE = 12                 # Selected subcarriers for motion detection
+NUM_SUBCARRIERS = 64  # HT20: 64 subcarriers
+EXPECTED_CSI_LEN = 128  # 64 SC × 2 bytes (I/Q pairs)
+GUARD_BAND_LOW = 11  # First valid subcarrier
+GUARD_BAND_HIGH = 52  # Last valid subcarrier
+DC_SUBCARRIER = 32  # DC null subcarrier
+BAND_SIZE = 12  # Selected subcarriers for motion detection
 
 # Optional local overrides (config_local.py is gitignored)
 # Skip local overrides only under pytest to keep tests hermetic.
 if "pytest" not in sys.modules:
     try:
         import src.config_local as _local
+
         for _name in dir(_local):
             if _name.isupper():
                 globals()[_name] = getattr(_local, _name)

@@ -25,13 +25,14 @@ DEFAULT_PERCENTILE = 95
 # Multiplier for "auto" mode threshold (reduces false positives)
 DEFAULT_ADAPTIVE_FACTOR = 1.1
 
+
 def get_threshold_percentile(threshold_mode):
     """
     Get percentile based on threshold mode.
-    
+
     Args:
         threshold_mode: "auto" (P95) or "min" (P100)
-    
+
     Returns:
         int: percentile value
     """
@@ -44,10 +45,10 @@ def get_threshold_percentile(threshold_mode):
 def get_threshold_factor(threshold_mode):
     """
     Get multiplier based on threshold mode.
-    
+
     Args:
         threshold_mode: "auto" (1.1×) or "min" (1.0×)
-    
+
     Returns:
         float: multiplier value
     """
@@ -60,16 +61,16 @@ def get_threshold_factor(threshold_mode):
 def calculate_adaptive_threshold(cal_values, threshold_mode="auto"):
     """
     Calculate adaptive threshold from calibration values.
-    
+
     MVS: threshold = percentile(mv_values) × factor
-    
+
     AUTO mode applies a 1.1× multiplier to reduce false positives.
     MIN mode uses the raw percentile value for maximum sensitivity.
-    
+
     Args:
         cal_values: List of calibration values (moving variance)
         threshold_mode: "auto" (P95 × 1.1) or "min" (P100 × 1.0)
-    
+
     Returns:
         tuple: (adaptive_threshold, percentile)
     """

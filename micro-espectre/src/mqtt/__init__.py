@@ -11,4 +11,4 @@ License: GPLv3
 from .handler import MQTTHandler
 from .commands import MQTTCommands
 
-__all__ = ['MQTTHandler', 'MQTTCommands']
+__all__ = ["MQTTHandler", "MQTTCommands"]

@@ -1,0 +1,18 @@
+[tool.ruff]
+target-version = "py312"
+line-length = 120
+extend-exclude = [
+    # Vendored verbatim from a third-party repo (see src/LICENSE-st7789py.txt) -
+    # left untouched so it stays diffable against upstream.
+    "src/st7789py.py",
+    "src/fonts/vga1_8x8.py",
+]
+# Python source only - ruff also formats fenced ```python blocks inside
+# Markdown by default, which would reformat prose docs/examples, not code.
+include = ["*.py"]
+
+[tool.ruff.lint]
+# Conservative set: pyflakes (F, e.g. unused imports/names) + pycodestyle (E/W)
+# + import sorting (I). No opinionated rules that would force logic-level
+# rewrites - this is a formatting/lint pass, not a refactor.
+select = ["E", "F", "W", "I"]

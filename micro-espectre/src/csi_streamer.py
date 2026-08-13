@@ -21,6 +21,7 @@ Usage:
 Author: Francesco Pace <francesco.pace@gmail.com>
 License: GPLv3
 """
+
 import socket
 import time
 import gc
@@ -48,23 +49,22 @@ CHIP_C6 = 6
 def detect_chip_code():
     """Detect chip type and return code for protocol"""
     machine = os.uname().machine.upper()
-    if 'ESP32-C6' in machine or 'ESP32C6' in machine:
+    if "ESP32-C6" in machine or "ESP32C6" in machine:
         return CHIP_C6
-    elif 'ESP32-C5' in machine or 'ESP32C5' in machine:
+    elif "ESP32-C5" in machine or "ESP32C5" in machine:
         return CHIP_C5
-    elif 'ESP32-C3' in machine or 'ESP32C3' in machine:
+    elif "ESP32-C3" in machine or "ESP32C3" in machine:
         return CHIP_C3
-    elif 'ESP32-S3' in machine or 'ESP32S3' in machine:
+    elif "ESP32-S3" in machine or "ESP32S3" in machine:
         return CHIP_S3
-    elif 'ESP32-S2' in machine or 'ESP32S2' in machine:
+    elif "ESP32-S2" in machine or "ESP32S2" in machine:
         return CHIP_S2
-    elif 'ESP32' in machine:
+    elif "ESP32" in machine:
         return CHIP_ESP32
     return CHIP_UNKNOWN
 
 
-def _stream_loop(wlan, chip_code, dest_ip, duration_sec=0, stop_flag=None, ctl=None,
-                  trigger=None, display=None):
+def _stream_loop(wlan, chip_code, dest_ip, duration_sec=0, stop_flag=None, ctl=None, trigger=None, display=None):
     """
     Core CSI streaming loop over an already-connected wlan.
 
@@ -94,13 +94,13 @@ def _stream_loop(wlan, chip_code, dest_ip, duration_sec=0, stop_flag=None, ctl=N
     duration_sec = int(duration_sec)
 
     # Start traffic generator
-    traffic_mode = getattr(config, 'TRAFFIC_GENERATOR_MODE', 'ping')
+    traffic_mode = getattr(config, "TRAFFIC_GENERATOR_MODE", "ping")
     traffic_gen = TrafficGenerator(mode=traffic_mode)
     traffic_gen_started = False
     if config.TRAFFIC_GENERATOR_RATE > 0:
         if traffic_gen.start(config.TRAFFIC_GENERATOR_RATE):
             traffic_gen_started = True
-            print(f'Traffic generator: {traffic_mode}, {config.TRAFFIC_GENERATOR_RATE} pps')
+            print(f"Traffic generator: {traffic_mode}, {config.TRAFFIC_GENERATOR_RATE} pps")
         time.sleep(1)
 
     # Phase 1: Gain lock (stabilizes AGC/FFT)
@@ -110,7 +110,7 @@ def _stream_loop(wlan, chip_code, dest_ip, duration_sec=0, stop_flag=None, ctl=N
     # needs_cv = True means gain lock was skipped (AGC too low or not supported)
     # This flag is sent in each packet so the receiver knows if CV normalization is needed
     gain_locked = not needs_cv
-    print(f'Gain locked: {gain_locked} (needs_cv_normalization={needs_cv})')
+    print(f"Gain locked: {gain_locked} (needs_cv_normalization={needs_cv})")
 
     # Create UDP socket for streaming (after gain lock to reduce memory pressure)
     gc.collect()
@@ -137,13 +137,13 @@ def _stream_loop(wlan, chip_code, dest_ip, duration_sec=0, stop_flag=None, ctl=N
     packet_buf[5] = NUM_SUBCARRIERS & 0xFF
     packet_buf[6] = (NUM_SUBCARRIERS >> 8) & 0xFF
 
-    print('')
-    print(f'Streaming to: {dest_ip}:{STREAM_PORT}')
-    print(f'Subcarriers:  {NUM_SUBCARRIERS} (HT20)')
-    print(f'Packet size:  {packet_size} bytes')
+    print("")
+    print(f"Streaming to: {dest_ip}:{STREAM_PORT}")
+    print(f"Subcarriers:  {NUM_SUBCARRIERS} (HT20)")
+    print(f"Packet size:  {packet_size} bytes")
     duration_str = "infinite" if duration_sec == 0 else str(duration_sec) + "s"
-    print(f'Duration:     {duration_str}')
-    print('')
+    print(f"Duration:     {duration_str}")
+    print("")
 
     # Streaming loop
     start_time = time.ticks_ms()
@@ -164,7 +164,7 @@ def _stream_loop(wlan, chip_code, dest_ip, duration_sec=0, stop_flag=None, ctl=N
                 ctl.maybe_send_heartbeat()
                 cmd = ctl.poll_command()
                 if cmd is not None and cmd[0] == "STOP":
-                    print('Streaming stopped by control command')
+                    print("Streaming stopped by control command")
                     break
 
             # Local trigger (e.g. BOOT button): send STOP over loopback so
@@ -172,7 +172,7 @@ def _stream_loop(wlan, chip_code, dest_ip, duration_sec=0, stop_flag=None, ctl=N
             # on the next iteration, rather than breaking directly here -
             # keeps one source of truth for "how streaming stops".
             if trigger is not None and ctl is not None and trigger.pressed():
-                print('[trigger] press detected - sending loopback STOP')
+                print("[trigger] press detected - sending loopback STOP")
                 ctl.send_loopback("STOP")
 
             if display is not None and ctl is not None:
@@ -180,7 +180,7 @@ def _stream_loop(wlan, chip_code, dest_ip, duration_sec=0, stop_flag=None, ctl=N
 
             # Check external stop request (e.g. set programmatically by a caller)
             if stop_flag is not None and stop_flag.stop:
-                print('Streaming stopped by control command')
+                print("Streaming stopped by control command")
                 break
 
             # Check duration
@@ -198,14 +198,16 @@ def _stream_loop(wlan, chip_code, dest_ip, duration_sec=0, stop_flag=None, ctl=N
                 if csi_data is None:
                     filtered_count += 1
                     if filtered_count % 100 == 1:
-                        print(f"[WARN] Filtered {filtered_count} packets with wrong SC count (got {raw_len} bytes, expected {EXPECTED_CSI_LEN})")
+                        print(
+                            f"[WARN] Filtered {filtered_count} packets with wrong SC count (got {raw_len} bytes, expected {EXPECTED_CSI_LEN})"
+                        )
                     del frame
                     continue
 
-                if remap_tag in ('double_ht20', 'double_ht57_and_remap') and not collapse_logged:
+                if remap_tag in ("double_ht20", "double_ht57_and_remap") and not collapse_logged:
                     print("[INFO] CSI double-length collapse active: 256->128 and/or 228->114")
                     collapse_logged = True
-                if remap_tag in ('ht57_to_64', 'double_ht57_and_remap') and not remap_logged:
+                if remap_tag in ("ht57_to_64", "double_ht57_and_remap") and not remap_logged:
                     print("[INFO] CSI remap active: 57->64 SC (left_pad=4, right_pad=3)")
                     remap_logged = True
                 del frame
@@ -234,8 +236,8 @@ def _stream_loop(wlan, chip_code, dest_ip, duration_sec=0, stop_flag=None, ctl=N
                     delta = packet_count - last_progress_count
                     pps = int((delta * 1000) / elapsed_block) if elapsed_block > 0 else 0
 
-                    filter_str = f' | filtered: {filtered_count}' if filtered_count > 0 else ''
-                    print(f'Sent {packet_count} pkts | {pps} pps | seq: {seq_num}{filter_str}')
+                    filter_str = f" | filtered: {filtered_count}" if filtered_count > 0 else ""
+                    print(f"Sent {packet_count} pkts | {pps} pps | seq: {seq_num}{filter_str}")
 
                     last_progress_time = current_time
                     last_progress_count = packet_count
@@ -243,17 +245,17 @@ def _stream_loop(wlan, chip_code, dest_ip, duration_sec=0, stop_flag=None, ctl=N
                 time.sleep_us(100)
 
     except KeyboardInterrupt:
-        print('\n\nStreaming stopped by user')
+        print("\n\nStreaming stopped by user")
 
     finally:
-        print('Cleaning up stream...')
+        print("Cleaning up stream...")
         sock.close()
         if traffic_gen_started and traffic_gen.is_running():
             traffic_gen.stop()
 
     elapsed = time.ticks_diff(time.ticks_ms(), start_time) / 1000
     avg_pps = packet_count / elapsed if elapsed > 0 else 0
-    print(f'\nTotal: {packet_count} packets in {elapsed:.1f}s ({avg_pps:.1f} pps avg)')
+    print(f"\nTotal: {packet_count} packets in {elapsed:.1f}s ({avg_pps:.1f} pps avg)")
     return packet_count
 
 
@@ -266,20 +268,20 @@ def stream_csi(dest_ip, duration_sec=0):
         dest_ip: Destination IP address
         duration_sec: Duration in seconds (0 = infinite)
     """
-    print('')
-    print('=' * 60)
-    print('  CSI UDP Streamer')
-    print('=' * 60)
+    print("")
+    print("=" * 60)
+    print("  CSI UDP Streamer")
+    print("=" * 60)
 
     # Connect WiFi (also enables CSI)
     wlan = connect_wifi()
     chip_type = os.uname().machine
     chip_code = detect_chip_code()
-    print(f'Chip: {chip_type} (code: {chip_code})')
+    print(f"Chip: {chip_type} (code: {chip_code})")
 
-    print('')
-    print('Press Ctrl+C to stop')
-    print('=' * 60)
+    print("")
+    print("Press Ctrl+C to stop")
+    print("=" * 60)
 
     try:
         return _stream_loop(wlan, chip_code, dest_ip, duration_sec, stop_flag=None)
@@ -287,8 +289,7 @@ def stream_csi(dest_ip, duration_sec=0):
         cleanup_wifi(wlan)
 
 
-def stream_with_wlan(wlan, dest_ip, duration_sec=0, stop_flag=None, ctl=None,
-                      trigger=None, display=None):
+def stream_with_wlan(wlan, dest_ip, duration_sec=0, stop_flag=None, ctl=None, trigger=None, display=None):
     """
     Stream CSI using an already-connected wlan - does NOT touch the WiFi
     connection. Used by the control-plane boot loop, which needs WiFi to stay
@@ -309,6 +310,7 @@ def stream_with_wlan(wlan, dest_ip, duration_sec=0, stop_flag=None, ctl=None,
     """
     chip_type = os.uname().machine
     chip_code = detect_chip_code()
-    print(f'Chip: {chip_type} (code: {chip_code})')
-    return _stream_loop(wlan, chip_code, dest_ip, duration_sec, stop_flag=stop_flag, ctl=ctl,
-                         trigger=trigger, display=display)
+    print(f"Chip: {chip_type} (code: {chip_code})")
+    return _stream_loop(
+        wlan, chip_code, dest_ip, duration_sec, stop_flag=stop_flag, ctl=ctl, trigger=trigger, display=display
+    )

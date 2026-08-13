@@ -14,6 +14,7 @@ safe from both the idle loop and the hot CSI streaming loop.
 Author: Claude Code (for Brennan C)
 License: GPLv3 (matches parent project)
 """
+
 import time
 from machine import Pin
 import src.config as config

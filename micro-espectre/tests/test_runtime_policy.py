@@ -8,7 +8,7 @@ main Micro-ESPectre loop.
 import sys
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).parent.parent / 'src'))
+sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
 from detector_interface import MotionState
 from runtime_policy import RuntimeMotionPolicy

@@ -13,10 +13,11 @@ Usage:
 Author: Claude Code (for Brennan C)
 License: GPLv3 (matches parent project)
 """
+
 import time
 from src.triggers.gpio_button import GpioButtonTrigger
 
-print('Watching BOOT button (GPIO0) - press it a few times, Ctrl-C to stop.')
+print("Watching BOOT button (GPIO0) - press it a few times, Ctrl-C to stop.")
 trigger = GpioButtonTrigger()
 count = 0
 
@@ -24,7 +25,7 @@ try:
     while True:
         if trigger.pressed():
             count += 1
-            print('press #{} detected'.format(count))
+            print("press #{} detected".format(count))
         time.sleep_ms(20)
 except KeyboardInterrupt:
-    print('\nStopped. Total presses detected: {}'.format(count))
+    print("\nStopped. Total presses detected: {}".format(count))

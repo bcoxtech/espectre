@@ -9,8 +9,8 @@ This module exposes only the nine features used by the production MLP.
 Author: Francesco Pace <francesco.pace@gmail.com>
 License: GPLv3
 """
-import math
 
+import math
 
 
 def calc_skewness(values, count, mean, std):
@@ -89,7 +89,7 @@ def calc_autocorrelation(turbulence_buffer, buffer_count, mean=None, variance=No
     autocovariance = 0.0
     for i in range(buffer_count - lag):
         autocovariance += (turbulence_buffer[i] - mean) * (turbulence_buffer[i + lag] - mean)
-    autocovariance /= (buffer_count - lag)
+    autocovariance /= buffer_count - lag
     return autocovariance / variance
 
 
@@ -138,8 +138,15 @@ def calc_waveform_length(turbulence_buffer, buffer_count):
 
 # Production feature set (9 turbulence-window statistics/temporal patterns)
 DEFAULT_FEATURES = [
-    'turb_mean', 'turb_std', 'turb_max', 'turb_min', 'turb_iqr',
-    'turb_skewness', 'turb_autocorr', 'turb_mad', 'waveform_length'
+    "turb_mean",
+    "turb_std",
+    "turb_max",
+    "turb_min",
+    "turb_iqr",
+    "turb_skewness",
+    "turb_autocorr",
+    "turb_mad",
+    "waveform_length",
 ]
 
 
@@ -174,30 +181,30 @@ def extract_features_by_name(turbulence_buffer, buffer_count, amplitudes=None, f
     # Sort once if any sort-dependent feature is requested (IQR, MAD).
     _sorted = None
     for name in feature_names:
-        if name == 'turb_iqr' or name == 'turb_mad':
+        if name == "turb_iqr" or name == "turb_mad":
             _sorted = list(turb_list)
             _sorted.sort()
             break
 
     features = []
     for name in feature_names:
-        if name == 'turb_mean':
+        if name == "turb_mean":
             features.append(turb_mean)
-        elif name == 'turb_std':
+        elif name == "turb_std":
             features.append(turb_std)
-        elif name == 'turb_max':
+        elif name == "turb_max":
             features.append(turb_max)
-        elif name == 'turb_min':
+        elif name == "turb_min":
             features.append(turb_min)
-        elif name == 'turb_iqr':
+        elif name == "turb_iqr":
             features.append(calc_iqr(turb_list, n, sorted_values=_sorted))
-        elif name == 'turb_skewness':
+        elif name == "turb_skewness":
             features.append(calc_skewness(turb_list, n, turb_mean, turb_std))
-        elif name == 'turb_autocorr':
+        elif name == "turb_autocorr":
             features.append(calc_autocorrelation(turb_list, n, mean=turb_mean, variance=turb_var))
-        elif name == 'turb_mad':
+        elif name == "turb_mad":
             features.append(calc_mad(turb_list, n, sorted_values=_sorted))
-        elif name == 'waveform_length':
+        elif name == "waveform_length":
             features.append(calc_waveform_length(turb_list, n))
         else:
             raise ValueError(f"Unknown feature: {name}")

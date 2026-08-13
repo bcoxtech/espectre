@@ -23,6 +23,9 @@ PyWavelets>=1.9.0       # Wavelet transforms (pywt)
 pytest>=9.0.3           # Test framework
 pytest-cov>=7.1.0       # Coverage plugin for pytest
 
+# Format/Lint
+ruff>=0.16.2             # Formatting + linting (see ./check, pyproject.toml)
+
 # Code Coverage (C++ tests)
 gcovr>=8.6              # Code coverage reports for C++ tests
 

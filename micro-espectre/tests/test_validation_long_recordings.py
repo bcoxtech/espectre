@@ -105,9 +105,7 @@ def _long_recording_uses_cv_normalization(baseline_packets, movement_packets):
 
 def _evaluate_mvs_long_recording(baseline_packets, movement_packets):
     """Run production-style MVS + NBVI across a long recording split."""
-    use_cv_normalization = _long_recording_uses_cv_normalization(
-        baseline_packets, movement_packets
-    )
+    use_cv_normalization = _long_recording_uses_cv_normalization(baseline_packets, movement_packets)
     selected_band, adaptive_threshold = run_calibration(
         baseline_packets,
         num_subcarriers=64,

@@ -9,12 +9,11 @@ to _DRIVERS below - no changes needed anywhere else.
 Author: Claude Code (for Brennan C)
 License: GPLv3 (matches parent project)
 """
+
 from src.display.base import DisplayInterface
 
 _DRIVERS = {
-    "st7789_waveshare147": (
-        "src.display.st7789_waveshare147", "ST7789WaveshareDisplay"
-    ),
+    "st7789_waveshare147": ("src.display.st7789_waveshare147", "ST7789WaveshareDisplay"),
 }
 
 
@@ -22,6 +21,7 @@ def load_display():
     """Return a DisplayInterface instance per config.DISPLAY_DRIVER, or None
     if unset (boards without a display leave this off)."""
     import src.config as config
+
     driver = getattr(config, "DISPLAY_DRIVER", None)
     if not driver:
         return None

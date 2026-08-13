@@ -7,6 +7,7 @@ Manages connection, publishing state updates, and processing remote commands.
 Author: Francesco Pace <francesco.pace@gmail.com>
 License: GPLv3
 """
+
 import json
 import time
 from umqtt.simple import MQTTClient
@@ -15,11 +16,11 @@ from src.mqtt.commands import MQTTCommands
 
 class MQTTHandler:
     """MQTT handler with publishing and command support"""
-    
+
     def __init__(self, config, detector, wlan, traffic_generator=None, band_calibration_func=None, global_state=None):
         """
         Initialize MQTT handler
-        
+
         Args:
             config: Configuration module
             detector: IDetector instance (MVSDetector or MLDetector)
@@ -36,16 +37,16 @@ class MQTTHandler:
         self.global_state = global_state
         self.client = None
         self.cmd_handler = None
-        
+
         # Topics
         self.base_topic = config.MQTT_TOPIC
         self.cmd_topic = f"{config.MQTT_TOPIC}/cmd"
         self.response_topic = f"{config.MQTT_TOPIC}/response"
-        
+
         # Publishing state
         self.last_variance = 0.0
         self.last_state = 0  # STATE_IDLE
-        
+
     def connect(self):
         """Connect to MQTT broker"""
         self.client = MQTTClient(
@@ -53,13 +54,13 @@ class MQTTHandler:
             self.config.MQTT_BROKER,
             port=self.config.MQTT_PORT,
             user=self.config.MQTT_USERNAME,
-            password=self.config.MQTT_PASSWORD
+            password=self.config.MQTT_PASSWORD,
         )
-        
-        print('Connecting to MQTT broker...')
+
+        print("Connecting to MQTT broker...")
         self.client.connect()
-        print('MQTT connected')
-        
+        print("MQTT connected")
+
         # Initialize command handler
         self.cmd_handler = MQTTCommands(
             self.client,
@@ -69,42 +70,41 @@ class MQTTHandler:
             self.wlan,
             self.traffic_gen,
             self.band_calibration_func,
-            self.global_state
+            self.global_state,
         )
-        
+
         # Set callback for incoming messages
         self.client.set_callback(self._on_message)
-        
+
         # Subscribe to command topic
         self.client.subscribe(self.cmd_topic)
-        #print(f'Subscribed to: {self.cmd_topic}')
-        
+        # print(f'Subscribed to: {self.cmd_topic}')
+
         return self.client
-    
+
     def _on_message(self, topic, msg):
         """Callback for incoming MQTT messages"""
         try:
-            topic_str = topic.decode('utf-8') if isinstance(topic, bytes) else topic
-            
+            topic_str = topic.decode("utf-8") if isinstance(topic, bytes) else topic
+
             if topic_str == self.cmd_topic:
                 # Process command
                 self.cmd_handler.process_command(msg)
-            
+
         except Exception as e:
             print(f"Error processing MQTT message: {e}")
-    
+
     def check_messages(self):
         """Check for incoming MQTT messages (non-blocking)"""
         try:
             self.client.check_msg()
         except Exception as e:
             print(f"Error checking MQTT messages: {e}")
-    
-    def publish_state(self, current_variance, current_state, current_threshold, 
-                     packet_delta, dropped_delta, pps):
+
+    def publish_state(self, current_variance, current_state, current_threshold, packet_delta, dropped_delta, pps):
         """
         Publish current state to MQTT
-        
+
         Args:
             current_variance: Current moving variance (or probability for ML)
             current_state: Current state (0=IDLE, 1=MOTION)
@@ -113,36 +113,36 @@ class MQTTHandler:
             dropped_delta: Packets dropped since last publish
             pps: Packets per second
         """
-        state_str = 'motion' if current_state == 1 else 'idle'
-        
+        state_str = "motion" if current_state == 1 else "idle"
+
         payload = {
-            'movement': round(current_variance, 4),
-            'threshold': round(current_threshold, 4),
-            'state': state_str,
-            'packets_processed': packet_delta,
-            'packets_dropped': dropped_delta,
-            'pps': pps,
-            'timestamp': time.time()
+            "movement": round(current_variance, 4),
+            "threshold": round(current_threshold, 4),
+            "state": state_str,
+            "packets_processed": packet_delta,
+            "packets_dropped": dropped_delta,
+            "pps": pps,
+            "timestamp": time.time(),
         }
-        
+
         try:
             self.client.publish(self.base_topic, json.dumps(payload))
         except Exception as e:
             print(f"Error publishing to MQTT: {e}")
-        
+
         # Update state
         self.last_variance = current_variance
         self.last_state = current_state
-    
+
     def disconnect(self):
         """Disconnect from MQTT broker"""
         if self.client:
             try:
                 self.client.disconnect()
-                print('MQTT disconnected')
+                print("MQTT disconnected")
             except Exception as e:
                 print(f"Error disconnecting MQTT: {e}")
-    
+
     def publish_info(self):
         """Publish system info"""
         if self.cmd_handler:

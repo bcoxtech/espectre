@@ -20,22 +20,23 @@ for context on why 240x320 mode is used for this 172x320 physical panel.
 Author: Claude Code (for Brennan C)
 License: GPLv3 (matches parent project)
 """
+
 import time
 from src.display.st7789_waveshare147 import ST7789WaveshareDisplay
 from src.st7789py import RED, GREEN
 
-print('Initializing display...')
+print("Initializing display...")
 display = ST7789WaveshareDisplay()
 
-print('Fill RED')
+print("Fill RED")
 display.tft.fill(RED)
 time.sleep(1)
 
-print('Fill GREEN')
+print("Fill GREEN")
 display.tft.fill(GREEN)
 time.sleep(1)
 
-print('Drawing HELLO text via update()')
+print("Drawing HELLO text via update()")
 display.update(state="IDLE", controller_ip="192.168.0.99", heap_free=123456, packet_count=0)
 
-print('Done. If you saw red -> green -> a status readout, the pins and offset are correct.')
+print("Done. If you saw red -> green -> a status readout, the pins and offset are correct.")

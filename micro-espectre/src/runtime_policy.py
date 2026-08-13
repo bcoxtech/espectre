@@ -59,11 +59,7 @@ class RuntimeMotionPolicy:
         else:
             self.pending_hits += 1
 
-        required_hits = (
-            self.motion_on_hits
-            if self.pending_state == MotionState.MOTION
-            else self.motion_off_hits
-        )
+        required_hits = self.motion_on_hits if self.pending_state == MotionState.MOTION else self.motion_off_hits
         if self.pending_hits >= required_hits:
             self.effective_state = self.pending_state
             self.pending_hits = 0

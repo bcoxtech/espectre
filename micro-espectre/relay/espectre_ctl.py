@@ -34,18 +34,57 @@ Modes:
 Subcommand names deliberately match `me knock` / `me list` / `me start` /
 `me stop` (the equivalent commands when run through the full `me` CLI).
 """
+
 import argparse
+import fcntl
+import ipaddress
 import json
 import socket
 import select
+import struct
 import sys
 import time
 from pathlib import Path
 
 PORT = 5002
-BROADCAST_ADDR = "192.168.0.255"  # isolated segment, /24
+IFACE = "eth0.100"  # VLAN trunk sub-interface carrying the isolated segment
+# Used only if auto-detection (below) can't read IFACE's address - e.g. the
+# interface is down or renamed. The segment's subnet has drifted before
+# (192.168.0.0/24 -> .1.0/24 -> .50.0/24), which is exactly what
+# auto-detection exists to stop mattering; this is a last-resort value, not
+# the source of truth.
+FALLBACK_BROADCAST_ADDR = "192.168.50.255"
 KNOCK_INTERVAL_SEC = 5
 STALE_AFTER_SEC = 20  # drop a node from "live" listing if no heartbeat in this long
+
+SIOCGIFADDR = 0x8915
+SIOCGIFNETMASK = 0x891B
+
+
+def _iface_ipv4(iface, request):
+    """Read one IPv4 field (address or netmask) off a live interface via ioctl."""
+    s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    try:
+        packed = fcntl.ioctl(s.fileno(), request, struct.pack("256s", iface[:15].encode()))
+    finally:
+        s.close()
+    return socket.inet_ntoa(packed[20:24])
+
+
+def detect_broadcast_addr(iface=IFACE):
+    """Derive the broadcast address from iface's current IP/netmask, so a
+    router-side subnet change doesn't silently break discovery again."""
+    try:
+        ip = _iface_ipv4(iface, SIOCGIFADDR)
+        netmask = _iface_ipv4(iface, SIOCGIFNETMASK)
+        network = ipaddress.IPv4Network(f"{ip}/{netmask}", strict=False)
+        return str(network.broadcast_address)
+    except OSError as e:
+        print(f"[broadcast] auto-detect on {iface} failed ({e}), falling back to {FALLBACK_BROADCAST_ADDR}")
+        return FALLBACK_BROADCAST_ADDR
+
+
+BROADCAST_ADDR = detect_broadcast_addr()
 
 # Persisted mac -> {node_id, ip, chip, state, last_seen}, so node IDs and
 # last-known state survive across separate `me`/`espectre_ctl.py` invocations
@@ -262,11 +301,17 @@ def build_parser():
         description=__doc__,
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
+    parser.add_argument(
+        "--broadcast",
+        metavar="ADDR",
+        help=f"Override the broadcast address (default: auto-detected from {IFACE}, currently {BROADCAST_ADDR})",
+    )
     subparsers = parser.add_subparsers(dest="command")
 
     knock_parser = subparsers.add_parser("knock", help="Broadcast discovery, print responding boards, exit")
-    knock_parser.add_argument("timeout", type=float, nargs="?", default=5.0,
-                               help="Discovery window in seconds (default: 5.0)")
+    knock_parser.add_argument(
+        "timeout", type=float, nargs="?", default=5.0, help="Discovery window in seconds (default: 5.0)"
+    )
 
     subparsers.add_parser("list", help="Print the last-known cache, no network activity")
 
@@ -280,6 +325,8 @@ def build_parser():
 if __name__ == "__main__":
     try:
         args = build_parser().parse_args()
+        if args.broadcast:
+            BROADCAST_ADDR = args.broadcast
         if args.command == "knock":
             print(f"knocking for {args.timeout}s...")
             discover_all(timeout=args.timeout, verbose=False)
