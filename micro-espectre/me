@@ -889,7 +889,11 @@ def collect_csi_data(args):
         print(f"  ./me collect --label baseline --duration 10")
         print(f"  ./me collect --info")
         sys.exit(1)
-    
+
+    if (args.x is None) != (args.y is None):
+        print(f"{Fore.RED}❌ --x and --y must be provided together{Style.RESET_ALL}")
+        sys.exit(1)
+
     print(f"\n{Fore.MAGENTA}╔═══════════════════════════════════════════════════════════╗{Style.RESET_ALL}")
     print(f"{Fore.MAGENTA}║           μESPectre - CSI Data Collection                 ║{Style.RESET_ALL}")
     print(f"{Fore.MAGENTA}╚═══════════════════════════════════════════════════════════╝{Style.RESET_ALL}")
@@ -902,6 +906,10 @@ def collect_csi_data(args):
     print(f"  {Fore.CYAN}UDP Port:{Style.RESET_ALL}  {args.udp_port}")
     if args.description:
         print(f"  {Fore.CYAN}Description:{Style.RESET_ALL} {args.description}")
+    if args.x is not None:
+        print(f"  {Fore.CYAN}Position:{Style.RESET_ALL}  ({args.x}, {args.y})")
+    if args.node_id:
+        print(f"  {Fore.CYAN}Node ID:{Style.RESET_ALL}   {args.node_id}")
     print()
     print(f"  {Fore.YELLOW}Chip type and gain lock status auto-detected from CSI stream{Style.RESET_ALL}")
     print(f"  {Fore.YELLOW}Make sure ESP32 is streaming: ./me stream --ip <PC_IP>{Style.RESET_ALL}")
@@ -913,7 +921,10 @@ def collect_csi_data(args):
         port=args.udp_port,
         contributor=args.contributor,
         description=args.description,
-        bind_host=resolved_bind_ip
+        bind_host=resolved_bind_ip,
+        x=args.x,
+        y=args.y,
+        node_id=args.node_id
     )
     
     try:
@@ -1403,8 +1414,14 @@ Examples:
                                help='Local IP/interface for UDP bind (default: auto-detect)')
     collect_parser.add_argument('--contributor', '-c',
                                help='GitHub username of the contributor')
-    collect_parser.add_argument('--description', 
+    collect_parser.add_argument('--description',
                                help='Description for the collected samples')
+    collect_parser.add_argument('--x', type=float, default=None,
+                               help='X coordinate in meters, for calibration-walk tagging (requires --y)')
+    collect_parser.add_argument('--y', type=float, default=None,
+                               help='Y coordinate in meters, for calibration-walk tagging (requires --x)')
+    collect_parser.add_argument('--node-id', default=None,
+                               help='Identifier of the node this sample was captured from (e.g. node1)')
 
     # Detect command (runs on PC, receives UDP from ESP32)
     detect_parser = subparsers.add_parser('detect', help='Run live ML motion detection from CSI UDP stream')
