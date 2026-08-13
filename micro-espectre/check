@@ -1,0 +1,68 @@
+#!/usr/bin/env python3
+"""
+check - format/lint/test lifecycle runner for micro-espectre.
+
+One command instead of remembering the individual ruff/pytest invocations
+(same idea as a gradlew task set). Config lives in pyproject.toml.
+
+Usage:
+    ./check format         # ruff format .          (rewrites files)
+    ./check format-check   # ruff format --check .  (no changes - what CI runs)
+    ./check lint           # ruff check .            (not CI-enforced yet - see pyproject.toml)
+    ./check test           # pytest tests/
+    ./check all            # format-check + test - matches what CI enforces
+"""
+import subprocess
+import sys
+from pathlib import Path
+
+ROOT = Path(__file__).parent
+
+
+def run(cmd):
+    print(f"$ {' '.join(cmd)}")
+    return subprocess.run(cmd, cwd=ROOT).returncode
+
+
+def cmd_format():
+    return run([sys.executable, "-m", "ruff", "format", "."])
+
+
+def cmd_format_check():
+    return run([sys.executable, "-m", "ruff", "format", "--check", "."])
+
+
+def cmd_lint():
+    return run([sys.executable, "-m", "ruff", "check", "."])
+
+
+def cmd_test():
+    return run([sys.executable, "-m", "pytest", "tests/", "-v", "--cov=src", "--cov-report=term-missing"])
+
+
+def cmd_all():
+    for step in (cmd_format_check, cmd_test):
+        code = step()
+        if code != 0:
+            return code
+    return 0
+
+
+COMMANDS = {
+    "format": cmd_format,
+    "format-check": cmd_format_check,
+    "lint": cmd_lint,
+    "test": cmd_test,
+    "all": cmd_all,
+}
+
+
+def main():
+    if len(sys.argv) != 2 or sys.argv[1] not in COMMANDS:
+        print(__doc__)
+        sys.exit(0 if len(sys.argv) == 1 else 1)
+    sys.exit(COMMANDS[sys.argv[1]]())
+
+
+if __name__ == "__main__":
+    main()
