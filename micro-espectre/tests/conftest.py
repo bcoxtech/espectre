@@ -20,16 +20,16 @@ from datetime import datetime
 
 # Add src and tools to path for imports
 # src is inserted last (position 0) so it takes precedence for config imports
-SRC_PATH = Path(__file__).parent.parent / 'src'
-TOOLS_PATH = Path(__file__).parent.parent / 'tools'
+SRC_PATH = Path(__file__).parent.parent / "src"
+TOOLS_PATH = Path(__file__).parent.parent / "tools"
 sys.path.insert(0, str(TOOLS_PATH))
 sys.path.insert(0, str(SRC_PATH))
 
 from config import DEFAULT_SUBCARRIERS, SEG_WINDOW_SIZE, HAMPEL_WINDOW, HAMPEL_THRESHOLD
 
 # Data directory (shared between tests and tools)
-DATA_DIR = Path(__file__).parent.parent / 'data'
-DATASET_INFO_PATH = DATA_DIR / 'dataset_info.json'
+DATA_DIR = Path(__file__).parent.parent / "data"
+DATASET_INFO_PATH = DATA_DIR / "dataset_info.json"
 PAIR_MAX_DELTA_SECONDS = 30 * 60
 UNIT_TEST_SUBCARRIERS = DEFAULT_SUBCARRIERS
 
@@ -231,9 +231,7 @@ def build_long_test_params(chips=None):
             pytest.param(
                 dataset,
                 id=(
-                    f"{chip.lower()}_long_"
-                    f"{len(baseline_packets)}b_{len(movement_packets)}m_"
-                    f"start{motion_start_packet}"
+                    f"{chip.lower()}_long_{len(baseline_packets)}b_{len(movement_packets)}m_start{motion_start_packet}"
                 ),
             )
         )
@@ -247,24 +245,27 @@ def build_long_test_params(chips=None):
         )
     return params
 
+
 # ============================================================================
 # Configuration Fixtures
 # ============================================================================
+
 
 @pytest.fixture(params=build_long_test_params())
 def long_test_config(request):
     """Validated long test recording split from data/test/."""
     return request.param
 
+
 @pytest.fixture
 def default_subcarriers(request):
     """
     Default subcarrier band for testing (HT20: 64 SC only).
-    
+
     Matches C++ test configuration exactly (test_motion_detection.cpp).
     """
     try:
-        dataset_config = request.getfixturevalue('dataset_config')
+        dataset_config = request.getfixturevalue("dataset_config")
     except pytest.FixtureLookupError:
         # Unit/integration tests that do not define dataset_config still need
         # a deterministic 12-SC band. Real-data performance tests define
@@ -295,11 +296,11 @@ def pairing_mode(request):
 def segmentation_config():
     """Default segmentation configuration - matches C++ DETECTOR_DEFAULT_WINDOW_SIZE"""
     return {
-        'window_size': SEG_WINDOW_SIZE,  # DETECTOR_DEFAULT_WINDOW_SIZE
-        'threshold': 1.0,
-        'enable_hampel': True,
-        'hampel_window': HAMPEL_WINDOW,
-        'hampel_threshold': HAMPEL_THRESHOLD,
+        "window_size": SEG_WINDOW_SIZE,  # DETECTOR_DEFAULT_WINDOW_SIZE
+        "threshold": 1.0,
+        "enable_hampel": True,
+        "hampel_window": HAMPEL_WINDOW,
+        "hampel_threshold": HAMPEL_THRESHOLD,
     }
 
 
@@ -307,14 +308,15 @@ def segmentation_config():
 def hampel_config():
     """Default Hampel filter configuration"""
     return {
-        'window_size': HAMPEL_WINDOW,
-        'threshold': HAMPEL_THRESHOLD,
+        "window_size": HAMPEL_WINDOW,
+        "threshold": HAMPEL_THRESHOLD,
     }
 
 
 # ============================================================================
 # Synthetic Data Fixtures
 # ============================================================================
+
 
 @pytest.fixture
 def constant_values():
@@ -378,6 +380,7 @@ def synthetic_turbulence_movement():
 # CSI Data Fixtures
 # ============================================================================
 
+
 @pytest.fixture
 def synthetic_csi_packet():
     """Generate a synthetic CSI packet (64 subcarriers, I/Q pairs)"""
@@ -400,9 +403,9 @@ def synthetic_csi_baseline_packets():
             I = int(base_amplitude + np.random.normal(0, 2))
             Q = int(base_amplitude * 0.3 + np.random.normal(0, 2))
             # Espressif CSI format: [Imaginary, Real, ...] per subcarrier
-            iq_data[sc * 2] = np.clip(Q, -127, 127)      # Imaginary first
+            iq_data[sc * 2] = np.clip(Q, -127, 127)  # Imaginary first
             iq_data[sc * 2 + 1] = np.clip(I, -127, 127)  # Real second
-        packets.append({'csi_data': iq_data, 'label': 'baseline'})
+        packets.append({"csi_data": iq_data, "label": "baseline"})
     return packets
 
 
@@ -419,9 +422,9 @@ def synthetic_csi_movement_packets():
             I = int(base_amplitude + np.random.normal(0, 8))
             Q = int(base_amplitude * 0.3 + np.random.normal(0, 8))
             # Espressif CSI format: [Imaginary, Real, ...] per subcarrier
-            iq_data[sc * 2] = np.clip(Q, -127, 127)      # Imaginary first
+            iq_data[sc * 2] = np.clip(Q, -127, 127)  # Imaginary first
             iq_data[sc * 2 + 1] = np.clip(I, -127, 127)  # Real second
-        packets.append({'csi_data': iq_data, 'label': 'movement'})
+        packets.append({"csi_data": iq_data, "label": "movement"})
     return packets
 
 
@@ -429,12 +432,14 @@ def synthetic_csi_movement_packets():
 # Real CSI Data Fixtures (optional - skip if not available)
 # ============================================================================
 
+
 @pytest.fixture
 def real_csi_data_available():
     """Check if real CSI data files are available"""
     from csi_utils import find_dataset
+
     try:
-        find_dataset(chip='C6')
+        find_dataset(chip="C6")
         return True
     except FileNotFoundError:
         return False
@@ -445,8 +450,9 @@ def real_baseline_packets(real_csi_data_available):
     """Load real baseline CSI packets (skip if not available)"""
     if not real_csi_data_available:
         pytest.skip("Real CSI data not available")
-    
+
     from csi_utils import load_baseline_and_movement
+
     baseline, _ = load_baseline_and_movement()
     return baseline
 
@@ -456,8 +462,9 @@ def real_movement_packets(real_csi_data_available):
     """Load real movement CSI packets (skip if not available)"""
     if not real_csi_data_available:
         pytest.skip("Real CSI data not available")
-    
+
     from csi_utils import load_baseline_and_movement
+
     _, movement = load_baseline_and_movement()
     return movement
 
@@ -467,34 +474,31 @@ def real_turbulence_values(real_csi_data_available, default_subcarriers):
     """Calculate turbulence values from real CSI data"""
     if not real_csi_data_available:
         pytest.skip("Real CSI data not available")
-    
+
     from csi_utils import load_baseline_and_movement, calculate_spatial_turbulence
-    
+
     baseline, movement = load_baseline_and_movement()
     turbulence_values = []
-    
+
     for packet in baseline:
         turbulence = calculate_spatial_turbulence(
-            packet['csi_data'],
-            default_subcarriers,
-            gain_locked=packet.get('gain_locked', True)
+            packet["csi_data"], default_subcarriers, gain_locked=packet.get("gain_locked", True)
         )
         turbulence_values.append(float(turbulence))
-    
+
     for packet in movement:
         turbulence = calculate_spatial_turbulence(
-            packet['csi_data'],
-            default_subcarriers,
-            gain_locked=packet.get('gain_locked', True)
+            packet["csi_data"], default_subcarriers, gain_locked=packet.get("gain_locked", True)
         )
         turbulence_values.append(float(turbulence))
-    
+
     return turbulence_values
 
 
 # ============================================================================
 # Utility Fixtures
 # ============================================================================
+
 
 @pytest.fixture
 def tolerance():
@@ -511,14 +515,15 @@ import tempfile
 import os
 
 # Use a temp file to share results between test module and conftest hook
-_PERF_RESULTS_FILE = os.path.join(tempfile.gettempdir(), 'espectre_perf_results.json')
+_PERF_RESULTS_FILE = os.path.join(tempfile.gettempdir(), "espectre_perf_results.json")
 
 
-def record_performance(chip: str, algorithm: str, recall: float, fp_rate: float,
-                       precision: float = 0.0, f1: float = 0.0):
+def record_performance(
+    chip: str, algorithm: str, recall: float, fp_rate: float, precision: float = 0.0, f1: float = 0.0
+):
     """
     Record performance metrics for the summary table.
-    
+
     Args:
         chip: Chip type (C3, C5, C6, ESP32, S3)
         algorithm: Algorithm name (mvs_default, mvs_nbvi, ml)
@@ -531,23 +536,18 @@ def record_performance(chip: str, algorithm: str, recall: float, fp_rate: float,
     results = {}
     if os.path.exists(_PERF_RESULTS_FILE):
         try:
-            with open(_PERF_RESULTS_FILE, 'r') as f:
+            with open(_PERF_RESULTS_FILE, "r") as f:
                 results = json.load(f)
         except (json.JSONDecodeError, IOError):
             results = {}
-    
+
     # Add new result
     if chip not in results:
         results[chip] = {}
-    results[chip][algorithm] = {
-        'recall': recall,
-        'fp_rate': fp_rate,
-        'precision': precision,
-        'f1': f1
-    }
-    
+    results[chip][algorithm] = {"recall": recall, "fp_rate": fp_rate, "precision": precision, "f1": f1}
+
     # Save
-    with open(_PERF_RESULTS_FILE, 'w') as f:
+    with open(_PERF_RESULTS_FILE, "w") as f:
         json.dump(results, f)
 
 
@@ -561,81 +561,84 @@ def pytest_terminal_summary(terminalreporter, exitstatus, config):
     """Print performance summary table at the end of test session."""
     if not os.path.exists(_PERF_RESULTS_FILE):
         return
-    
+
     try:
-        with open(_PERF_RESULTS_FILE, 'r') as f:
+        with open(_PERF_RESULTS_FILE, "r") as f:
             results = json.load(f)
     except (json.JSONDecodeError, IOError):
         return
-    
+
     if not results:
         return
-    
+
     terminalreporter.write_line("")
     terminalreporter.write_line("=" * 105)
     terminalreporter.write_line("                              PERFORMANCE SUMMARY TABLE (Python)")
     terminalreporter.write_line("=" * 105)
     terminalreporter.write_line("")
-    terminalreporter.write_line("| Chip   | MVS Default             | MVS + NBVI              | ML                      |")
-    terminalreporter.write_line("|--------|-------------------------|-------------------------|-------------------------|")
-    
+    terminalreporter.write_line(
+        "| Chip   | MVS Default             | MVS + NBVI              | ML                      |"
+    )
+    terminalreporter.write_line(
+        "|--------|-------------------------|-------------------------|-------------------------|"
+    )
+
     # Sort chips for consistent output
-    for chip in ['C3', 'C5', 'C6', 'ESP32', 'S3']:
+    for chip in ["C3", "C5", "C6", "ESP32", "S3"]:
         if chip not in results:
             continue
-        
+
         chip_results = results[chip]
-        
+
         # MVS Default
-        if 'mvs_default' in chip_results:
-            mvs_default = chip_results['mvs_default']
+        if "mvs_default" in chip_results:
+            mvs_default = chip_results["mvs_default"]
             mvs_default_str = f"{mvs_default['recall']:.1f}% R, {mvs_default['fp_rate']:.1f}% FP"
         else:
             mvs_default_str = "N/A"
-        
+
         # MVS + NBVI
-        if 'mvs_nbvi' in chip_results:
-            mvs = chip_results['mvs_nbvi']
+        if "mvs_nbvi" in chip_results:
+            mvs = chip_results["mvs_nbvi"]
             mvs_str = f"{mvs['recall']:.1f}% R, {mvs['fp_rate']:.1f}% FP"
         else:
             mvs_str = "N/A"
-        
+
         # ML
-        if 'ml' in chip_results:
-            ml = chip_results['ml']
+        if "ml" in chip_results:
+            ml = chip_results["ml"]
             ml_str = f"{ml['recall']:.1f}% R, {ml['fp_rate']:.1f}% FP"
         else:
             ml_str = "N/A"
-        
+
         terminalreporter.write_line(f"| {chip:<6} | {mvs_default_str:<23} | {mvs_str:<23} | {ml_str:<23} |")
-    
+
     terminalreporter.write_line("")
     terminalreporter.write_line("Legend: R = Recall, FP = False Positive Rate")
     terminalreporter.write_line(format_targets_summary_line())
     terminalreporter.write_line("=" * 105)
-    
+
     # Detailed table for PERFORMANCE.md
     terminalreporter.write_line("")
     terminalreporter.write_line("                         DETAILED METRICS (for PERFORMANCE.md)")
     terminalreporter.write_line("-" * 105)
     terminalreporter.write_line("| Chip   | Algorithm   | Recall  | Precision | FP Rate | F1-Score |")
     terminalreporter.write_line("|--------|-------------|---------|-----------|---------|----------|")
-    
-    for chip in ['C3', 'C5', 'C6', 'ESP32', 'S3']:
+
+    for chip in ["C3", "C5", "C6", "ESP32", "S3"]:
         if chip not in results:
             continue
-        
+
         chip_results = results[chip]
-        
-        for algo_key, algo_name in [('mvs_default', 'MVS Default'), ('mvs_nbvi', 'MVS + NBVI'), ('ml', 'ML')]:
+
+        for algo_key, algo_name in [("mvs_default", "MVS Default"), ("mvs_nbvi", "MVS + NBVI"), ("ml", "ML")]:
             if algo_key in chip_results:
                 r = chip_results[algo_key]
                 terminalreporter.write_line(
                     f"| {chip:<6} | {algo_name:<11} | {r['recall']:>6.1f}% | {r.get('precision', 0):>8.1f}% | {r['fp_rate']:>6.1f}% | {r.get('f1', 0):>7.1f}% |"
                 )
-    
+
     terminalreporter.write_line("-" * 105)
-    
+
     # Cleanup
     os.remove(_PERF_RESULTS_FILE)
-

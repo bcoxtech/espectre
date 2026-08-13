@@ -23,6 +23,7 @@ acceptable only because this runs on a physically isolated network segment.
 Author: Claude Code (for Brennan C)
 License: GPLv3 (matches parent project)
 """
+
 import socket
 import time
 import os
@@ -38,6 +39,7 @@ HEARTBEAT_INTERVAL_MS = 5000
 
 class StopFlag:
     """Mutable flag passed into stream_with_wlan() so a STOP command can interrupt it mid-loop."""
+
     def __init__(self):
         self.stop = False
 
@@ -48,17 +50,17 @@ class StopFlag:
 def get_mac_str():
     """Return this device's STA MAC as a colon-separated hex string."""
     wlan = network.WLAN(network.STA_IF)
-    mac_bytes = wlan.config('mac')
-    return ubinascii.hexlify(mac_bytes, ':').decode()
+    mac_bytes = wlan.config("mac")
+    return ubinascii.hexlify(mac_bytes, ":").decode()
 
 
 def get_chip_str():
     machine = os.uname().machine.upper()
-    for variant in ['S3', 'S2', 'C3', 'C5', 'C6']:
+    for variant in ["S3", "S2", "C3", "C5", "C6"]:
         if variant in machine:
             return variant
-    if 'ESP32' in machine:
-        return 'ESP32'
+    if "ESP32" in machine:
+        return "ESP32"
     return machine
 
 
@@ -69,13 +71,13 @@ class ControlServer:
     """
 
     def __init__(self):
-        self.port = getattr(config, 'CONTROL_PORT', 5002)
+        self.port = getattr(config, "CONTROL_PORT", 5002)
         self.mac = get_mac_str()
         self.chip = get_chip_str()
         self.state = STATE_IDLE
         self.controller = None  # IP of whoever last knocked - None until paired
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        self.sock.bind(('0.0.0.0', self.port))
+        self.sock.bind(("0.0.0.0", self.port))
         self.sock.settimeout(0)  # non-blocking: recvfrom raises OSError immediately if empty
         self._last_heartbeat = time.ticks_ms()
 
@@ -158,8 +160,7 @@ class ControlServer:
         # src/triggers/). Loopback does NOT mutate self.controller, so it
         # can never hijack pairing away from (or be affected by) a relay.
         if sender_ip != self.controller and sender_ip != "127.0.0.1":
-            print("[control] ignored '{}' from untrusted {} (controller={})".format(
-                cmd, sender_ip, self.controller))
+            print("[control] ignored '{}' from untrusted {} (controller={})".format(cmd, sender_ip, self.controller))
             return None
 
         if cmd == "START":

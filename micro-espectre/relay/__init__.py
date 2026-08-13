@@ -9,4 +9,4 @@ License: GPLv3
 
 from .espectre_ctl import discover_all, send_command, resolve, registry, STALE_AFTER_SEC
 
-__all__ = ['discover_all', 'send_command', 'resolve', 'registry', 'STALE_AFTER_SEC']
+__all__ = ["discover_all", "send_command", "resolve", "registry", "STALE_AFTER_SEC"]

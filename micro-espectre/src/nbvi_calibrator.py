@@ -27,31 +27,43 @@ import os
 
 try:
     from src.config import (
-        NUM_SUBCARRIERS, EXPECTED_CSI_LEN,
-        GUARD_BAND_LOW, GUARD_BAND_HIGH, DC_SUBCARRIER, BAND_SIZE,
-        SEG_WINDOW_SIZE, CALIBRATION_BUFFER_SIZE,
-        ENABLE_HAMPEL_FILTER, HAMPEL_WINDOW, HAMPEL_THRESHOLD,
-        ENABLE_LOWPASS_FILTER, LOWPASS_CUTOFF
+        NUM_SUBCARRIERS,
+        EXPECTED_CSI_LEN,
+        GUARD_BAND_LOW,
+        GUARD_BAND_HIGH,
+        DC_SUBCARRIER,
+        BAND_SIZE,
+        SEG_WINDOW_SIZE,
+        CALIBRATION_BUFFER_SIZE,
+        ENABLE_HAMPEL_FILTER,
+        HAMPEL_WINDOW,
+        HAMPEL_THRESHOLD,
+        ENABLE_LOWPASS_FILTER,
+        LOWPASS_CUTOFF,
     )
-    from src.utils import (
-        to_signed_int8, calculate_percentile
-    )
+    from src.utils import to_signed_int8, calculate_percentile
     from src.segmentation import SegmentationContext
 except ImportError:
     from config import (
-        NUM_SUBCARRIERS, EXPECTED_CSI_LEN,
-        GUARD_BAND_LOW, GUARD_BAND_HIGH, DC_SUBCARRIER, BAND_SIZE,
-        SEG_WINDOW_SIZE, CALIBRATION_BUFFER_SIZE,
-        ENABLE_HAMPEL_FILTER, HAMPEL_WINDOW, HAMPEL_THRESHOLD,
-        ENABLE_LOWPASS_FILTER, LOWPASS_CUTOFF
+        NUM_SUBCARRIERS,
+        EXPECTED_CSI_LEN,
+        GUARD_BAND_LOW,
+        GUARD_BAND_HIGH,
+        DC_SUBCARRIER,
+        BAND_SIZE,
+        SEG_WINDOW_SIZE,
+        CALIBRATION_BUFFER_SIZE,
+        ENABLE_HAMPEL_FILTER,
+        HAMPEL_WINDOW,
+        HAMPEL_THRESHOLD,
+        ENABLE_LOWPASS_FILTER,
+        LOWPASS_CUTOFF,
     )
-    from utils import (
-        to_signed_int8, calculate_percentile
-    )
+    from utils import to_signed_int8, calculate_percentile
     from segmentation import SegmentationContext
 
 # Constants
-BUFFER_FILE = '/nbvi_buffer.bin'
+BUFFER_FILE = "/nbvi_buffer.bin"
 
 # Threshold for null subcarrier detection (mean amplitude below this = null)
 NULL_SUBCARRIER_THRESHOLD = 1.0
@@ -73,21 +85,22 @@ def cleanup_buffer_file():
 class NBVICalibrator:
     """
     Automatic NBVI calibrator with percentile-based baseline detection
-    
+
     Collects CSI packets at boot and automatically selects optimal subcarriers
     using multi-strategy NBVI with percentile-based baseline detection.
-    
+
     Uses file-based storage to avoid RAM limitations. Magnitudes stored as
     uint8 (max CSI magnitude ~181 fits in 1 byte).
-    
+
     After subcarrier selection, calculates adaptive threshold using Pxx * factor.
     """
-    
-    def __init__(self, buffer_size=None, mvs_window_size=None,
-                 percentile=5, alpha=0.75, min_spacing=1, noise_gate_percentile=15):
+
+    def __init__(
+        self, buffer_size=None, mvs_window_size=None, percentile=5, alpha=0.75, min_spacing=1, noise_gate_percentile=15
+    ):
         """
         Initialize NBVI calibrator
-        
+
         Args:
             buffer_size: Number of packets to collect (default: CALIBRATION_BUFFER_SIZE from config)
             mvs_window_size: MVS window size for validation (default: SEG_WINDOW_SIZE from config)
@@ -102,21 +115,21 @@ class NBVICalibrator:
         self._filtered_count = 0
         self._file = None
         self._initialized = False
-        
+
         # Batch write buffer to reduce flash I/O overhead (750 writes → 8 writes)
         self._write_batch_size = 100
         self._write_buf = bytearray(self._write_batch_size * NUM_SUBCARRIERS)
         self._write_buf_idx = 0
-        
+
         # Remove old buffer file if exists
         try:
             os.remove(BUFFER_FILE)
         except OSError:
             pass
-        
+
         # Open file for writing
-        self._file = open(BUFFER_FILE, 'wb')
-        
+        self._file = open(BUFFER_FILE, "wb")
+
         # NBVI parameters
         self.mvs_window_size = mvs_window_size if mvs_window_size is not None else SEG_WINDOW_SIZE
         self.percentile = percentile
@@ -139,11 +152,11 @@ class NBVICalibrator:
     def set_prefer_hint_on_tie(self, enabled):
         """If False, hint band must be strictly better than best candidate."""
         self.prefer_hint_on_tie = bool(enabled)
-    
+
     # ========================================================================
     # Buffer management
     # ========================================================================
-    
+
     def _prepare_for_reading(self):
         """Flush remaining buffer, close write mode and reopen for reading."""
         if self._file:
@@ -157,62 +170,64 @@ class NBVICalibrator:
         # Free write buffer — no longer needed after collection phase
         self._write_buf = None
         gc.collect()
-        self._file = open(self._buffer_file, 'rb')
-    
+        self._file = open(self._buffer_file, "rb")
+
     def free_buffer(self):
         """Free resources after calibration is complete."""
         if self._file:
             self._file.close()
             self._file = None
-        
+
         # Free batch buffer
         self._write_buf = None
-        
+
         try:
             os.remove(self._buffer_file)
         except OSError:
             pass
-    
+
     def get_packet_count(self):
         """Get the number of packets currently in the buffer."""
         return self._packet_count
-    
+
     def is_buffer_full(self):
         """Check if the buffer has collected enough packets."""
         return self._packet_count >= self.buffer_size
-    
+
     # ========================================================================
     # Packet collection
     # ========================================================================
-        
+
     def add_packet(self, csi_data):
         """
         Add CSI packet to calibration buffer (file-based)
-        
+
         HT20 only: expects 128 bytes (64 subcarriers x 2 I/Q).
-        
+
         Args:
             csi_data: CSI data array (128 bytes for HT20)
-        
+
         Returns:
             int: Current buffer size (progress indicator)
         """
         if self._packet_count >= self.buffer_size:
             return self.buffer_size
-        
+
         # STBC packets (256 bytes) are truncated upstream before reaching here.
         # See GitHub issue #76, espressif/esp-csi#238 for details.
         if len(csi_data) != EXPECTED_CSI_LEN:
             self._filtered_count += 1
             if self._filtered_count % 50 == 1:
-                print(f'[WARN] Filtered {self._filtered_count} packets with wrong SC count (got {len(csi_data)} bytes)')
+                print(f"[WARN] Filtered {self._filtered_count} packets with wrong SC count (got {len(csi_data)} bytes)")
             return self._packet_count
-        
+
         # Initialize on first packet
         if not self._initialized:
             self._initialized = True
-            print(f'NBVI: HT20 mode, {NUM_SUBCARRIERS} SC, guard [{GUARD_BAND_LOW}-{GUARD_BAND_HIGH}], DC={DC_SUBCARRIER}')
-        
+            print(
+                f"NBVI: HT20 mode, {NUM_SUBCARRIERS} SC, guard [{GUARD_BAND_LOW}-{GUARD_BAND_HIGH}], DC={DC_SUBCARRIER}"
+            )
+
         # Extract magnitudes into batch buffer (avoids per-packet flash write)
         # Guard band and DC subcarriers are zeroed without computing sqrt —
         # they are excluded from NBVI selection anyway (marked inf in calibrate()).
@@ -225,40 +240,40 @@ class NBVICalibrator:
             if sc < GUARD_BAND_LOW or sc > GUARD_BAND_HIGH or sc == DC_SUBCARRIER:
                 self._write_buf[buf_offset + sc] = 0
                 continue
-            
+
             q_idx = sc * 2 + 1
-            
+
             if q_idx < csi_len:
                 # Espressif CSI format: [Imaginary, Real, ...] per subcarrier
                 # Cast to Python int to avoid numpy int8 overflow on I*I / Q*Q.
-                Q = int(to_signed_int8(csi_data[sc * 2]))   # Imaginary first
-                I = int(to_signed_int8(csi_data[q_idx]))    # Real second
+                Q = int(to_signed_int8(csi_data[sc * 2]))  # Imaginary first
+                I = int(to_signed_int8(csi_data[q_idx]))  # Real second
                 # Integer arithmetic: I ∈ [-127,127] so I*I + Q*Q <= 32258.
-                mag = int(_sqrt(I*I + Q*Q))
+                mag = int(_sqrt(I * I + Q * Q))
                 self._write_buf[buf_offset + sc] = min(mag, 255)
             else:
                 self._write_buf[buf_offset + sc] = 0
-        
+
         self._write_buf_idx += 1
         self._packet_count += 1
-        
+
         # Batch write when buffer full (reduces flash writes from 750 to ~8)
         if self._write_buf_idx >= self._write_batch_size:
             self._file.write(self._write_buf)
             self._write_buf_idx = 0
-        
+
         return self._packet_count
-    
+
     # ========================================================================
     # File I/O helpers
     # ========================================================================
-    
+
     def _read_packet(self, packet_idx):
         """Read a single packet from file"""
         self._file.seek(packet_idx * NUM_SUBCARRIERS)
         data = self._file.read(NUM_SUBCARRIERS)
         return list(data) if data else None
-    
+
     def _packet_turbulence(self, data, band):
         """Calculate spatial turbulence from raw packet bytes.
 
@@ -274,23 +289,23 @@ class NBVICalibrator:
         if self.use_cv_normalization:
             return std / mean_mag if mean_mag > 1e-6 else 0.0
         return std
-    
+
     # ========================================================================
     # Calibration algorithm
     # ========================================================================
-    
+
     def _find_candidate_windows(self, current_band, window_size=200, step=50):
         """
         Find all candidate baseline windows using percentile-based detection.
         Streams packets from file one at a time to avoid large memory allocations.
-        
+
         NO absolute threshold - adapts automatically to environment.
         """
         if self._packet_count < window_size:
             return []
-        
+
         window_results = []
-        
+
         for i in range(0, self._packet_count - window_size + 1, step):
             # Two-pass streaming variance of turbulences (identical to calculate_variance)
             # Pass 1: mean
@@ -303,11 +318,11 @@ class NBVICalibrator:
                     break
                 sum_turb += self._packet_turbulence(data, current_band)
                 count += 1
-            
+
             if count == 0:
                 continue
             mean_turb = sum_turb / count
-            
+
             # Pass 2: variance
             sum_sq = 0.0
             self._file.seek(i * NUM_SUBCARRIERS)
@@ -317,32 +332,34 @@ class NBVICalibrator:
                     break
                 diff = self._packet_turbulence(data, current_band) - mean_turb
                 sum_sq += diff * diff
-            
+
             window_results.append((i, sum_sq / count))
-            
+
             if i % 200 == 0:
                 gc.collect()
-        
+
         if not window_results:
             return []
-        
+
         variances = [w[1] for w in window_results]
         p_threshold = calculate_percentile(variances, self.percentile)
-        
+
         candidates = [w for w in window_results if w[1] <= p_threshold]
         candidates.sort(key=lambda x: x[1])
-        
+
         return candidates
-    
+
     def _calculate_nbvi_from_stats(self, mean, std, mad=0.0, entropy=0.0):
         """
         Calculate multiple NBVI scores to evaluate different candidate bands.
         """
         if mean < 1e-6:
             return {
-                'nbvi_classic': float('inf'), 'nbvi_entropy': float('inf'),
-                'nbvi_mad': float('inf'),
-                'mean': mean, 'std': std,
+                "nbvi_classic": float("inf"),
+                "nbvi_entropy": float("inf"),
+                "nbvi_mad": float("inf"),
+                "mean": mean,
+                "std": std,
             }
 
         cv = std / mean
@@ -360,47 +377,45 @@ class NBVICalibrator:
         mad_score = self.alpha * energy_mad + (1 - self.alpha) * cv_mad
 
         return {
-            'nbvi_classic': base_score,
-            'nbvi_entropy': entropy_score,
-            'nbvi_mad': mad_score,
-            'mean': mean,
-            'std': std,
-            'mad': mad,
-            'entropy': entropy,
+            "nbvi_classic": base_score,
+            "nbvi_entropy": entropy_score,
+            "nbvi_mad": mad_score,
+            "mean": mean,
+            "std": std,
+            "mad": mad,
+            "entropy": entropy,
         }
-    
+
     def _apply_noise_gate(self, subcarrier_metrics):
         """Apply Noise Gate: exclude weak subcarriers and those with infinite NBVI"""
         # Collect valid means (exclude infinite NBVI, matching C++ implementation)
-        valid_means = [m['mean'] for m in subcarrier_metrics 
-                       if m['mean'] > 1.0 and m['nbvi'] != float('inf')]
-        
+        valid_means = [m["mean"] for m in subcarrier_metrics if m["mean"] > 1.0 and m["nbvi"] != float("inf")]
+
         if not valid_means:
             print("NBVI: Noise Gate - no valid subcarriers found")
             return []
-        
+
         threshold = calculate_percentile(valid_means, self.noise_gate_percentile)
         # Filter by mean threshold AND exclude infinite NBVI (matching C++)
-        filtered = [m for m in subcarrier_metrics 
-                if m['mean'] >= threshold and m['nbvi'] != float('inf')]
-        
+        filtered = [m for m in subcarrier_metrics if m["mean"] >= threshold and m["nbvi"] != float("inf")]
+
         return filtered
-    
+
     def _select_with_spacing_strict(self, sorted_metrics, k=12):
-        valid_candidates = [c for c in sorted_metrics if c['nbvi'] != float('inf')]
+        valid_candidates = [c for c in sorted_metrics if c["nbvi"] != float("inf")]
         for current_spacing in range(self.min_spacing, -1, -1):
             selected = []
             for candidate in valid_candidates:
                 if len(selected) >= k:
                     break
-                sc = candidate['subcarrier']
+                sc = candidate["subcarrier"]
                 if selected and min(abs(sc - s) for s in selected) < current_spacing:
                     continue
                 selected.append(sc)
             if len(selected) >= k:
                 selected.sort()
                 return selected
-        selected = [c['subcarrier'] for c in valid_candidates[:k]]
+        selected = [c["subcarrier"] for c in valid_candidates[:k]]
         selected.sort()
         return selected
 
@@ -410,27 +425,27 @@ class NBVICalibrator:
         for m in sorted_metrics:
             if len(selected) >= 5:
                 break
-            if m['nbvi'] != float('inf'):
-                selected.append(m['subcarrier'])
-        
+            if m["nbvi"] != float("inf"):
+                selected.append(m["subcarrier"])
+
         for candidate in sorted_metrics[5:]:
             if len(selected) >= k:
                 break
-            sc = candidate['subcarrier']
+            sc = candidate["subcarrier"]
             if min(abs(sc - s) for s in selected) >= self.min_spacing:
                 selected.append(sc)
-        
+
         if len(selected) < k:
             for candidate in sorted_metrics:
                 if len(selected) >= k:
                     break
-                sc = candidate['subcarrier']
+                sc = candidate["subcarrier"]
                 if sc not in selected:
                     selected.append(sc)
-        
+
         selected.sort()
         return selected
-    
+
     def _validate_subcarriers(self, band):
         """
         Validate subcarriers by running MVS on entire buffer.
@@ -443,7 +458,7 @@ class NBVICalibrator:
         """
         if self._packet_count < self.mvs_window_size:
             return 0.0, []
-        
+
         ctx = SegmentationContext(
             window_size=self.mvs_window_size,
             threshold=1.0,
@@ -463,23 +478,23 @@ class NBVICalibrator:
         # NBVI streaming phase, while 140 floats (560 bytes) fits comfortably.
         MV_SUBSAMPLE = 5
         mv_values = []
-        
+
         for pkt_idx in range(self._packet_count):
             packet_mags = self._read_packet(pkt_idx)
             if packet_mags is None:
                 continue
-            
+
             turbulence = self._packet_turbulence(packet_mags, band)
             ctx.add_turbulence(turbulence)
-            
+
             if pkt_idx < self.mvs_window_size:
                 continue
-            
+
             metrics = ctx.update_state()
-            mv_variance = metrics['moving_variance']
+            mv_variance = metrics["moving_variance"]
             if total_packets % MV_SUBSAMPLE == 0:
                 mv_values.append(mv_variance)
-            
+
             total_packets += 1
 
         if not mv_values:
@@ -489,29 +504,29 @@ class NBVICalibrator:
         motion_count = sum(1 for mv in mv_values if mv > adaptive_thr)
         fp_rate = motion_count / len(mv_values)
         return fp_rate, mv_values
-    
+
     def calibrate(self, hint_band=None):
         """
         Calibrate using NBVI Weighted with percentile-based detection.
-        
+
         Args:
             hint_band: Optional band to use for candidate window search.
                        If provided, uses this band to calculate turbulence
                        when finding baseline candidate windows.
                        Matches C++ start_calibration(current_band) behavior.
-        
+
         Returns:
             tuple: (selected_band, mv_values) or (None, []) if failed
         """
         window_size = 200
         step = 50
-        
+
         if self._packet_count < self.mvs_window_size + 10:
             print("NBVI: Not enough packets for calibration")
             return None, []
-        
+
         self._prepare_for_reading()
-        
+
         # Use hint_band if provided, otherwise use default band for finding candidate windows
         # This matches C++ behavior where start_calibration() receives current_band as hint
         if hint_band is not None:
@@ -519,41 +534,41 @@ class NBVICalibrator:
         else:
             search_band = list(range(GUARD_BAND_LOW, GUARD_BAND_LOW + BAND_SIZE))
         candidates = self._find_candidate_windows(search_band, window_size, step)
-        
+
         if not candidates:
             print("NBVI: Failed to find candidate windows")
             return None, []
-        
+
         print(f"NBVI: Found {len(candidates)} candidate windows")
-        
+
         best_fp_rate = 1.0
         best_band = None
         best_mv_values = []
         best_avg_nbvi = 0.0
         best_avg_mean = 0.0
         best_window_idx = 0
-        
+
         for idx, (start_idx, window_variance) in enumerate(candidates):
             self._file.seek(start_idx * NUM_SUBCARRIERS)
             # Read whole window (up to 200 * 64 = 12800 bytes) into memory
             # This avoids 64 separate passes over the file
             raw_data = self._file.read(window_size * NUM_SUBCARRIERS)
             count = len(raw_data) // NUM_SUBCARRIERS
-            
+
             if count == 0:
                 continue
-            
+
             # Build metrics from stats
             all_metrics = []
             for sc in range(NUM_SUBCARRIERS):
                 # Extract values for this subcarrier
                 vals = [raw_data[i * NUM_SUBCARRIERS + sc] for i in range(count)]
-                
+
                 mean = sum(vals) / count
                 diffs = [v - mean for v in vals]
                 var = sum(d * d for d in diffs) / count
                 std = math.sqrt(var) if var > 0 else 0.0
-                
+
                 # Entropy
                 min_v = min(vals)
                 max_v = max(vals)
@@ -564,13 +579,14 @@ class NBVICalibrator:
                     bin_w = range_v / 10
                     for v in vals:
                         b = int((v - min_v) / bin_w)
-                        if b == 10: b = 9
+                        if b == 10:
+                            b = 9
                         bins[b] += 1
                     for b in bins:
                         if b > 0:
                             p = b / count
                             entropy -= p * math.log2(p)
-                            
+
                 # MAD
                 sorted_vals = sorted(vals)
                 median = sorted_vals[count // 2]
@@ -578,41 +594,41 @@ class NBVICalibrator:
                 mad = abs_devs[count // 2]
 
                 metrics = self._calculate_nbvi_from_stats(mean, std, mad=mad, entropy=entropy)
-                metrics['subcarrier'] = sc
-                
-                _INF = float('inf')
+                metrics["subcarrier"] = sc
+
+                _INF = float("inf")
                 if sc < GUARD_BAND_LOW or sc > GUARD_BAND_HIGH or sc == DC_SUBCARRIER:
-                    metrics['nbvi_classic'] = _INF
-                    metrics['nbvi_entropy'] = _INF
-                    metrics['nbvi_mad'] = _INF
-                elif metrics['mean'] < NULL_SUBCARRIER_THRESHOLD:
-                    metrics['nbvi_classic'] = _INF
-                    metrics['nbvi_entropy'] = _INF
-                    metrics['nbvi_mad'] = _INF
+                    metrics["nbvi_classic"] = _INF
+                    metrics["nbvi_entropy"] = _INF
+                    metrics["nbvi_mad"] = _INF
+                elif metrics["mean"] < NULL_SUBCARRIER_THRESHOLD:
+                    metrics["nbvi_classic"] = _INF
+                    metrics["nbvi_entropy"] = _INF
+                    metrics["nbvi_mad"] = _INF
 
                 # Default for _apply_noise_gate compatibility
-                metrics['nbvi'] = metrics['nbvi_classic']
-                
+                metrics["nbvi"] = metrics["nbvi_classic"]
+
                 all_metrics.append(metrics)
-            
+
             filtered_metrics = self._apply_noise_gate(all_metrics)
-            
+
             # Generate Candidate 1: Entropy Spaced (Best for all chips in experiments)
-            sorted_entropy = sorted(filtered_metrics, key=lambda x: x['nbvi_entropy'])
+            sorted_entropy = sorted(filtered_metrics, key=lambda x: x["nbvi_entropy"])
             for m in sorted_entropy:
-                m['nbvi'] = m['nbvi_entropy']
+                m["nbvi"] = m["nbvi_entropy"]
             band_entropy = self._select_with_spacing_strict(sorted_entropy, k=BAND_SIZE)
 
             # Generate Candidate 2: MAD Clustered (Robust against noise spikes like on C6)
-            sorted_mad = sorted(filtered_metrics, key=lambda x: x['nbvi_mad'])
+            sorted_mad = sorted(filtered_metrics, key=lambda x: x["nbvi_mad"])
             for m in sorted_mad:
-                m['nbvi'] = m['nbvi_mad']
+                m["nbvi"] = m["nbvi_mad"]
             band_mad = self._select_with_spacing(sorted_mad, k=BAND_SIZE)
 
             # Generate Candidate 3: Classic Spaced (Alternative for tricky chips like C6)
-            sorted_classic = sorted(filtered_metrics, key=lambda x: x['nbvi_classic'])
+            sorted_classic = sorted(filtered_metrics, key=lambda x: x["nbvi_classic"])
             for m in sorted_classic:
-                m['nbvi'] = m['nbvi_classic']
+                m["nbvi"] = m["nbvi_classic"]
             band_classic_spaced = self._select_with_spacing_strict(sorted_classic, k=BAND_SIZE)
 
             # Generate Candidate 4: Classic Clustered (Best for C3)
@@ -628,20 +644,20 @@ class NBVICalibrator:
                 candidates_to_eval.append(band_classic_spaced)
             if len(band_classic) == BAND_SIZE and band_classic not in candidates_to_eval:
                 candidates_to_eval.append(band_classic)
-            
+
             for is_clustered, candidate_band in enumerate(candidates_to_eval):
                 if len(candidate_band) != BAND_SIZE:
                     continue
-                
+
                 # Save reporting stats before freeing all_metrics
-                selected_metrics = [m for m in all_metrics if m['subcarrier'] in candidate_band]
-                avg_nbvi = sum(m['nbvi'] for m in selected_metrics) / len(selected_metrics)
-                avg_mean = sum(m['mean'] for m in selected_metrics) / len(selected_metrics)
-                
+                selected_metrics = [m for m in all_metrics if m["subcarrier"] in candidate_band]
+                avg_nbvi = sum(m["nbvi"] for m in selected_metrics) / len(selected_metrics)
+                avg_mean = sum(m["mean"] for m in selected_metrics) / len(selected_metrics)
+
                 fp_rate, mv_values = self._validate_subcarriers(candidate_band)
-                
+
                 override = False
-                
+
                 if best_band is None:
                     override = True
                 elif fp_rate <= 0.05:
@@ -658,22 +674,22 @@ class NBVICalibrator:
                     best_window_idx = idx
                     best_avg_nbvi = avg_nbvi
                     best_avg_mean = avg_mean
-            
+
             del all_metrics
-        
+
         if best_band is None:
             print("NBVI: All candidate windows failed - using default subcarriers")
-            
+
             # Run validation on search_band (hint_band or default) to get MV values
             _, mv_values = self._validate_subcarriers(search_band)
-            
+
             print(f"NBVI: Fallback to default band")
-            
+
             if self._filtered_count > 0:
                 print(f"  Filtered: {self._filtered_count} packets (wrong SC count)")
-            
+
             return search_band, mv_values
-        
+
         HINT_FP_TOLERANCE = self.hint_fp_tolerance
         FP_COMPARE_EPSILON = 1e-6
         use_hint_band = False
@@ -690,23 +706,29 @@ class NBVICalibrator:
                 if hint_fp_rate <= acceptable_best_cmp:
                     use_hint_band = True
                 else:
-                    print(f"NBVI: Keeping candidate band with FP {best_fp_rate*100:.1f}% "
-                          f"vs hint {hint_fp_rate*100:.1f}% (acceptable target <5.0%)")
+                    print(
+                        f"NBVI: Keeping candidate band with FP {best_fp_rate * 100:.1f}% "
+                        f"vs hint {hint_fp_rate * 100:.1f}% (acceptable target <5.0%)"
+                    )
             elif not best_fp_acceptable:
                 if self.prefer_hint_on_tie:
                     hint_fp_ok = hint_fp_rate <= acceptable_best_cmp
                 else:
                     hint_fp_ok = (hint_fp_rate + FP_COMPARE_EPSILON) < strict_best_cmp
-                
+
                 if hint_fp_ok:
                     use_hint_band = True
                 else:
-                    print(f"NBVI: Hint FP ({hint_fp_rate*100:.1f}%) not better than "
-                          f"candidate ({best_fp_rate*100:.1f}%) - keeping NBVI band")
+                    print(
+                        f"NBVI: Hint FP ({hint_fp_rate * 100:.1f}%) not better than "
+                        f"candidate ({best_fp_rate * 100:.1f}%) - keeping NBVI band"
+                    )
             else:
-                print(f"NBVI: Keeping candidate band with FP {best_fp_rate*100:.1f}% "
-                      f"(target <5.0%, hint {hint_fp_rate*100:.1f}% not acceptable)")
-        
+                print(
+                    f"NBVI: Keeping candidate band with FP {best_fp_rate * 100:.1f}% "
+                    f"(target <5.0%, hint {hint_fp_rate * 100:.1f}% not acceptable)"
+                )
+
         if use_hint_band:
             best_band = list(hint_band)
             best_mv_values = hint_mv_values
@@ -715,16 +737,16 @@ class NBVICalibrator:
                 f"vs best {best_fp_rate * 100:.1f}%, tol {HINT_FP_TOLERANCE * 100:.1f}%, "
                 f"tie={'prefer' if self.prefer_hint_on_tie else 'strict'})"
             )
-        
+
         print(f"NBVI: Selected window {best_window_idx + 1}/{len(candidates)} with FP rate {best_fp_rate * 100:.1f}%")
-        
+
         print(f"NBVI: Band selection successful")
         print(f"  Band: {best_band}")
         print(f"  Avg NBVI: {best_avg_nbvi:.6f}")
         print(f"  Avg magnitude: {best_avg_mean:.2f}")
         print(f"  Est. FP rate: {best_fp_rate * 100:.1f}%")
-        
+
         if self._filtered_count > 0:
             print(f"  Filtered: {self._filtered_count} packets (wrong SC count)")
-        
+
         return best_band, best_mv_values

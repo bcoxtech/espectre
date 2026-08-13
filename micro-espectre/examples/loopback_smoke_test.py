@@ -17,24 +17,25 @@ unaffected either way, since that never uses loopback.
 Author: Claude Code (for Brennan C)
 License: GPLv3 (matches parent project)
 """
+
 import socket
 import time
 
 PORT = 5099  # scratch port, unrelated to the real control port
 
 sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-sock.bind(('0.0.0.0', PORT))
+sock.bind(("0.0.0.0", PORT))
 sock.settimeout(2)
 
-sock.sendto(b'PING', ('127.0.0.1', PORT))
+sock.sendto(b"PING", ("127.0.0.1", PORT))
 
 try:
     data, addr = sock.recvfrom(64)
-    if data == b'PING':
-        print('PASS: loopback works (received {} from {})'.format(data, addr))
+    if data == b"PING":
+        print("PASS: loopback works (received {} from {})".format(data, addr))
     else:
-        print('FAIL: received unexpected data:', data)
+        print("FAIL: received unexpected data:", data)
 except OSError as e:
-    print('FAIL: no packet received within timeout -', e)
+    print("FAIL: no packet received within timeout -", e)
 finally:
     sock.close()
