@@ -605,6 +605,8 @@ def _print_node_table(nodes, header_style=Fore.CYAN):
 def knock_nodes(args):
     """Broadcast KNOCK on the control-plane channel and list boards that reply (runs on host/relay, not ESP32)"""
     ctl = _import_relay_ctl()
+    if getattr(args, 'broadcast', None):
+        ctl.BROADCAST_ADDR = args.broadcast
 
     print(f"{Fore.MAGENTA}╔═══════════════════════════════════════════════════════════╗{Style.RESET_ALL}")
     print(f"{Fore.MAGENTA}║           μESPectre - Control-Plane Discovery              ║{Style.RESET_ALL}")
@@ -654,6 +656,8 @@ def list_nodes(args):
 
 def _discover_targets(ctl, args):
     """Shared by start/stop: knock, then resolve either --node or every discovered board."""
+    if getattr(args, 'broadcast', None):
+        ctl.BROADCAST_ADDR = args.broadcast
     print(f"{Fore.CYAN}Knocking for {args.timeout}s...{Style.RESET_ALL}")
     nodes = ctl.discover_all(timeout=args.timeout, verbose=False)
 
@@ -1335,6 +1339,8 @@ Examples:
         help='Discover control-plane boards over the network and list them (runs on host/relay, not ESP32)')
     knock_parser.add_argument('--timeout', type=float, default=5.0,
                              help='Discovery window in seconds (default: 5.0)')
+    knock_parser.add_argument('--broadcast',
+                             help='Override the broadcast address (default: auto-detected from the isolated segment interface)')
 
     # List command (show cached nodes without a live knock, runs on host/relay)
     list_parser = subparsers.add_parser('list',
@@ -1349,6 +1355,8 @@ Examples:
                              help='Streaming duration in seconds sent to each board (0 = infinite, default: 0)')
     start_parser.add_argument('--timeout', type=float, default=5.0,
                              help='Discovery window in seconds (default: 5.0)')
+    start_parser.add_argument('--broadcast',
+                             help='Override the broadcast address (default: auto-detected from the isolated segment interface)')
 
     # Stop command (control-plane remote stop, runs on host/relay)
     stop_parser = subparsers.add_parser('stop',
@@ -1357,6 +1365,8 @@ Examples:
                             help='Target a specific board by node ID, MAC, or IP (default: all discovered boards)')
     stop_parser.add_argument('--timeout', type=float, default=5.0,
                             help='Discovery window in seconds (default: 5.0)')
+    stop_parser.add_argument('--broadcast',
+                            help='Override the broadcast address (default: auto-detected from the isolated segment interface)')
 
     # Stream command
     stream_parser = subparsers.add_parser('stream', help='Stream CSI data via UDP for visualization')
