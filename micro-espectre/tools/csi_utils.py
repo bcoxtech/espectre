@@ -493,6 +493,9 @@ class CSICollector:
         contributor: str = None,
         description: str = None,
         bind_host: Optional[str] = None,
+        x: Optional[float] = None,
+        y: Optional[float] = None,
+        node_id: Optional[str] = None,
     ):
         """
         Initialize collector.
@@ -503,6 +506,9 @@ class CSICollector:
             contributor: GitHub username of the contributor (auto-detected from git if not provided)
             description: Optional description for the collected samples
             bind_host: Local interface IP to bind UDP socket
+            x: X coordinate in meters, for calibration-walk tagging (paired with y)
+            y: Y coordinate in meters, for calibration-walk tagging (paired with x)
+            node_id: Identifier of the node this sample was captured from (e.g. 'node1')
         """
         self.label = label
         self.port = port
@@ -510,6 +516,9 @@ class CSICollector:
         self.chip = None  # Auto-detected from CSI packets
         self.contributor = contributor or get_git_username()
         self.description = description
+        self.x = x
+        self.y = y
+        self.node_id = node_id
 
         self.receiver = CSIReceiver(port=port, buffer_size=2000, bind_host=bind_host)
         self._recording = False
@@ -547,6 +556,9 @@ class CSICollector:
             collected_at: str - ISO timestamp
             duration_ms: float - Total duration
             format_version: str - Format version
+            x: float - X coordinate in meters (NaN if untagged)
+            y: float - Y coordinate in meters (NaN if untagged)
+            node_id: str - Node identifier (empty string if untagged)
         """
         if not packets:
             return None
@@ -575,6 +587,10 @@ class CSICollector:
             "collected_at": datetime.now().isoformat(),
             "duration_ms": duration_ms,
             "format_version": self.FORMAT_VERSION,
+            # Calibration-walk tagging (NaN/empty when not provided)
+            "x": self.x if self.x is not None else float("nan"),
+            "y": self.y if self.y is not None else float("nan"),
+            "node_id": self.node_id or "",
         }
 
         # Determine if gain lock was applied (from packet flags)
@@ -601,6 +617,9 @@ class CSICollector:
             collected_at=sample["collected_at"],
             gain_locked=gain_locked,
             description=self.description,
+            x=self.x,
+            y=self.y,
+            node_id=self.node_id,
         )
 
         return filepath
@@ -614,6 +633,9 @@ class CSICollector:
         collected_at: str = None,
         gain_locked: bool = True,
         description: str = None,
+        x: Optional[float] = None,
+        y: Optional[float] = None,
+        node_id: Optional[str] = None,
     ):
         """Update dataset info with current sample counts and file details"""
         info = load_dataset_info()
@@ -657,6 +679,11 @@ class CSICollector:
                     "gain_locked": bool(gain_locked),
                     "description": description,
                 }
+                if x is not None and y is not None:
+                    file_info["x"] = x
+                    file_info["y"] = y
+                if node_id:
+                    file_info["node_id"] = node_id
                 info["files"][self.label].append(file_info)
 
         save_dataset_info(info)
