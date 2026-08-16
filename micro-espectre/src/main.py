@@ -149,8 +149,12 @@ def connect_wifi():
 
     if wlan.isconnected():
         print_wifi_status(wlan)
-        # Disable power management
-        wlan.config(pm=wlan.PM_NONE)
+        # Power management (pm) is left at its post-connect default
+        # (PM_PERFORMANCE) here. PM_NONE is only needed for stable CSI
+        # capture while actually streaming, so it's applied/restored around
+        # each stream in csi_streamer.py instead of staying on permanently -
+        # holding PM_NONE from boot through an idle control-plane wait was
+        # keeping the radio at max power around the clock for no reason.
         # Stabilization
         time.sleep(1)
         return wlan

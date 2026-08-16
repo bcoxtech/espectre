@@ -283,6 +283,10 @@ def stream_csi(dest_ip, duration_sec=0):
     print("Press Ctrl+C to stop")
     print("=" * 60)
 
+    # Disable power-save for the duration of the stream - stable CSI capture
+    # needs the radio held active. No restore needed: cleanup_wifi() below
+    # tears the connection down fully once this one-shot stream ends.
+    wlan.config(pm=wlan.PM_NONE)
     try:
         return _stream_loop(wlan, chip_code, dest_ip, duration_sec, stop_flag=None)
     finally:
@@ -311,6 +315,13 @@ def stream_with_wlan(wlan, dest_ip, duration_sec=0, stop_flag=None, ctl=None, tr
     chip_type = os.uname().machine
     chip_code = detect_chip_code()
     print(f"Chip: {chip_type} (code: {chip_code})")
-    return _stream_loop(
-        wlan, chip_code, dest_ip, duration_sec, stop_flag=stop_flag, ctl=ctl, trigger=trigger, display=display
-    )
+    # Disable power-save only for this stream's duration, then restore it -
+    # the control-plane loop reuses this same wlan across many start/stop
+    # cycles and can sit idle for hours, so PM_NONE must not linger.
+    wlan.config(pm=wlan.PM_NONE)
+    try:
+        return _stream_loop(
+            wlan, chip_code, dest_ip, duration_sec, stop_flag=stop_flag, ctl=ctl, trigger=trigger, display=display
+        )
+    finally:
+        wlan.config(pm=wlan.PM_PERFORMANCE)
